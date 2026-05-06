@@ -1,0 +1,23 @@
+import type { PermissionLevel, Permissions, Person, ViewId } from '../types';
+
+export const permissionsForPermissionLevel = (permissionLevel: PermissionLevel): Permissions => {
+  switch (permissionLevel) {
+    case 'Admin':
+      return { projects: true, allocation: true, tasks: true, archive: true, people: true, settings: true };
+    case 'Manager':
+      return { projects: true, allocation: true, tasks: true, archive: true, people: true, settings: false };
+    case 'Artist':
+      return { projects: true, allocation: true, tasks: true, archive: true, people: false, settings: false };
+    case 'Client':
+      return { projects: true, allocation: false, tasks: true, archive: false, people: false, settings: false };
+  }
+};
+
+export const canAccess = (person: Person, view: ViewId) => person.permissions[view];
+export const canAdminPeople = (person: Person) => person.permissionLevel === 'Admin';
+export const canEditAllocation = (person: Person) => person.permissionLevel === 'Admin' || person.permissionLevel === 'Manager';
+export const canCreateProject = (person: Person) => person.permissionLevel === 'Admin' || person.permissionLevel === 'Manager';
+export const canEditTask = (person: Person, assignee: string) =>
+  person.permissionLevel === 'Admin' ||
+  person.permissionLevel === 'Manager' ||
+  (person.permissionLevel === 'Artist' && person.name === assignee);

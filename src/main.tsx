@@ -1,647 +1,351 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { CheckCircle2, ChevronRight, Circle, PanelRightClose, RotateCcw, Search, Settings } from 'lucide-react';
+import {
+  Archive,
+  Bell,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  FolderKanban,
+  ListChecks,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
+import { ArchiveView } from './components/ArchiveView';
+import { CalendarView } from './components/CalendarView';
+import { PeopleView, SettingsView } from './components/PeopleSettings';
+import { ProjectsView } from './components/ProjectsView';
+import { TaskView } from './components/TaskView';
+import { createSeedAllocations, createSeedPeople, createSeedProjects, createSeedTasks } from './data/seed';
+import { canAccess } from './lib/permissions';
+import { defaultThemeId, isThemeId, themes, themeStyle } from './themes';
+import type { ArchiveState, Task, TaskNotification, ViewId } from './types';
 import './styles.css';
-
-type TaskStatus = 'todo' | 'wip' | 'review' | 'blocked' | 'done';
-type TaskPhase = 'brief' | 'layout' | 'animation' | 'lighting' | 'delivery';
-type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
-
-type Subtask = {
-  id: string;
-  title: string;
-  done: boolean;
-};
-
-type Task = {
-  id: string;
-  projectId: string;
-  title: string;
-  status: TaskStatus;
-  phase: TaskPhase;
-  priority: TaskPriority;
-  dueDate: string;
-  assignee: string;
-  description: string;
-  subtasks: Subtask[];
-};
-
-type Project = {
-  id: string;
-  name: string;
-};
-
-type Filters = {
-  project: string;
-  status: 'all' | TaskStatus;
-  phase: 'all' | TaskPhase;
-  search: string;
-};
 
 const RELAY_STORAGE_KEY = 'relay:first-slice:ephemeral';
 const THEME_STORAGE_KEY = 'relay:theme';
+const CURRENT_PERSON_STORAGE_KEY = 'relay:current-person';
 
-const themeOptions = [
-  { id: 'theme-relay-brutalist', label: 'Relay Brutalist' },
-  { id: 'theme-nord', label: 'Nord' },
-  { id: 'theme-dracula', label: 'Dracula' },
-  { id: 'theme-gruvbox-dark', label: 'Gruvbox Dark' },
-  { id: 'theme-solarized-dark', label: 'Solarized Dark' },
-  { id: 'theme-tokyo-night', label: 'Tokyo Night' },
-  { id: 'theme-catppuccin-mocha', label: 'Catppuccin Mocha' },
-] as const;
-
-type ThemeId = (typeof themeOptions)[number]['id'];
-
-const defaultTheme: ThemeId = 'theme-relay-brutalist';
-
-const isThemeId = (value: string | null): value is ThemeId => themeOptions.some((theme) => theme.id === value);
-
-const projects: Project[] = [
-  { id: 'harbor-station', name: 'Harbor Station Launch Film' },
+const views: Array<{ id: ViewId; label: string; icon: LucideIcon }> = [
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
+  { id: 'allocation', label: 'Allocation', icon: CalendarDays },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks },
+  { id: 'archive', label: 'Archive', icon: Archive },
+  { id: 'people', label: 'People', icon: Users },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
-
-const statuses: TaskStatus[] = ['todo', 'wip', 'review', 'blocked', 'done'];
-const phases: TaskPhase[] = ['brief', 'layout', 'animation', 'lighting', 'delivery'];
-const priorities: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
-
-const statusLabels: Record<TaskStatus, string> = {
-  todo: 'To do',
-  wip: 'WIP',
-  review: 'Review',
-  blocked: 'Blocked',
-  done: 'Done',
-};
-
-const phaseLabels: Record<TaskPhase, string> = {
-  brief: 'Brief',
-  layout: 'Layout',
-  animation: 'Animation',
-  lighting: 'Lighting',
-  delivery: 'Delivery',
-};
-
-const priorityLabels: Record<TaskPriority, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  urgent: 'Urgent',
-};
-
-const createSeedTasks = (): Task[] => [
-  {
-    id: 'task-001',
-    projectId: 'harbor-station',
-    title: 'Lock launch film brief',
-    status: 'done',
-    phase: 'brief',
-    priority: 'high',
-    dueDate: '2026-05-03',
-    assignee: 'Mina',
-    description: 'Confirm the approved story beats, delivery targets, and client review cadence.',
-    subtasks: [
-      { id: 'task-001-a', title: 'Collect client notes', done: true },
-      { id: 'task-001-b', title: 'Publish final brief PDF', done: true },
-    ],
-  },
-  {
-    id: 'task-002',
-    projectId: 'harbor-station',
-    title: 'Block camera path for opening flythrough',
-    status: 'wip',
-    phase: 'layout',
-    priority: 'urgent',
-    dueDate: '2026-05-06',
-    assignee: 'Theo',
-    description: 'Create a clean camera pass through the concourse with timing markers for edit.',
-    subtasks: [
-      { id: 'task-002-a', title: 'Set camera spline', done: true },
-      { id: 'task-002-b', title: 'Add timing markers', done: false },
-      { id: 'task-002-c', title: 'Export playblast', done: false },
-    ],
-  },
-  {
-    id: 'task-003',
-    projectId: 'harbor-station',
-    title: 'Prep crowd layout proxy pass',
-    status: 'todo',
-    phase: 'layout',
-    priority: 'medium',
-    dueDate: '2026-05-08',
-    assignee: 'Ari',
-    description: 'Place readable low-density crowd proxies without competing with hero signage.',
-    subtasks: [
-      { id: 'task-003-a', title: 'Import proxy rigs', done: false },
-      { id: 'task-003-b', title: 'Rough in platform clusters', done: false },
-    ],
-  },
-  {
-    id: 'task-004',
-    projectId: 'harbor-station',
-    title: 'Animate departure board reveal',
-    status: 'review',
-    phase: 'animation',
-    priority: 'high',
-    dueDate: '2026-05-07',
-    assignee: 'Jules',
-    description: 'Polish the board flip timing and send a version for supervisor review.',
-    subtasks: [
-      { id: 'task-004-a', title: 'Ease flip timing', done: true },
-      { id: 'task-004-b', title: 'Submit viewport capture', done: true },
-      { id: 'task-004-c', title: 'Address first review note', done: false },
-    ],
-  },
-  {
-    id: 'task-005',
-    projectId: 'harbor-station',
-    title: 'Resolve glass shader artifacts',
-    status: 'blocked',
-    phase: 'lighting',
-    priority: 'urgent',
-    dueDate: '2026-05-05',
-    assignee: 'Nina',
-    description: 'Track down flickering reflections on the roof panels before lighting final.',
-    subtasks: [
-      { id: 'task-005-a', title: 'Reproduce in render wedge', done: true },
-      { id: 'task-005-b', title: 'Request latest material cache', done: false },
-      { id: 'task-005-c', title: 'Validate fixed shader', done: false },
-    ],
-  },
-  {
-    id: 'task-006',
-    projectId: 'harbor-station',
-    title: 'Set golden-hour lighting base',
-    status: 'wip',
-    phase: 'lighting',
-    priority: 'high',
-    dueDate: '2026-05-09',
-    assignee: 'Nina',
-    description: 'Build the first lighting pass for the atrium and platform hero angles.',
-    subtasks: [
-      { id: 'task-006-a', title: 'Balance exterior sun', done: true },
-      { id: 'task-006-b', title: 'Tune interior practicals', done: false },
-      { id: 'task-006-c', title: 'Render contact sheet', done: false },
-    ],
-  },
-  {
-    id: 'task-007',
-    projectId: 'harbor-station',
-    title: 'Assemble editorial review packet',
-    status: 'todo',
-    phase: 'delivery',
-    priority: 'medium',
-    dueDate: '2026-05-12',
-    assignee: 'Mina',
-    description: 'Prepare the first browser-friendly packet for internal editorial review.',
-    subtasks: [
-      { id: 'task-007-a', title: 'Collect latest playblasts', done: false },
-      { id: 'task-007-b', title: 'Add slate and frame range labels', done: false },
-    ],
-  },
-  {
-    id: 'task-008',
-    projectId: 'harbor-station',
-    title: 'Review signage placement pass',
-    status: 'review',
-    phase: 'layout',
-    priority: 'medium',
-    dueDate: '2026-05-06',
-    assignee: 'Ari',
-    description: 'Confirm wayfinding and brand signage are readable in approved camera angles.',
-    subtasks: [
-      { id: 'task-008-a', title: 'Check camera one', done: true },
-      { id: 'task-008-b', title: 'Check camera two', done: false },
-    ],
-  },
-  {
-    id: 'task-009',
-    projectId: 'harbor-station',
-    title: 'Publish internal delivery notes',
-    status: 'done',
-    phase: 'delivery',
-    priority: 'low',
-    dueDate: '2026-05-02',
-    assignee: 'Jules',
-    description: 'Document naming, review locations, and temporary export conventions.',
-    subtasks: [
-      { id: 'task-009-a', title: 'Write export checklist', done: true },
-      { id: 'task-009-b', title: 'Share with production', done: true },
-    ],
-  },
-  {
-    id: 'task-010',
-    projectId: 'harbor-station',
-    title: 'Create train door timing polish pass',
-    status: 'wip',
-    phase: 'animation',
-    priority: 'high',
-    dueDate: '2026-05-10',
-    assignee: 'Theo',
-    description: 'Match train door movement to the edit and remove mechanical jitter.',
-    subtasks: [
-      { id: 'task-010-a', title: 'Compare against edit timing', done: false },
-      { id: 'task-010-b', title: 'Polish left-side doors', done: false },
-      { id: 'task-010-c', title: 'Polish right-side doors', done: false },
-    ],
-  },
-];
-
-const progressFor = (task: Task) => {
-  const done = task.subtasks.filter((subtask) => subtask.done).length;
-  return { done, total: task.subtasks.length };
-};
-
-const matchesFilters = (task: Task, filters: Filters) => {
-  const query = filters.search.trim().toLowerCase();
-  const projectMatches = filters.project === 'all' || task.projectId === filters.project;
-  const statusMatches = filters.status === 'all' || task.status === filters.status;
-  const phaseMatches = filters.phase === 'all' || task.phase === filters.phase;
-  const searchMatches =
-    query.length === 0 ||
-    task.title.toLowerCase().includes(query) ||
-    task.assignee.toLowerCase().includes(query) ||
-    task.description.toLowerCase().includes(query);
-
-  return projectMatches && statusMatches && phaseMatches && searchMatches;
-};
 
 function App() {
-  const [tasks, setTasks] = React.useState<Task[]>(() => {
+  const [tasks, setTasks] = React.useState(() => {
     localStorage.setItem(RELAY_STORAGE_KEY, 'seed-reset-on-load');
     return createSeedTasks();
   });
-  const [theme, setTheme] = React.useState<ThemeId>(() => {
+  const [projects, setProjects] = React.useState(createSeedProjects);
+  const [people, setPeople] = React.useState(createSeedPeople);
+  const [allocations, setAllocations] = React.useState(createSeedAllocations);
+  const [archive, setArchive] = React.useState<ArchiveState>({ projects: [], tasks: [], subtasks: [], allocations: [] });
+  const [notifications, setNotifications] = React.useState<TaskNotification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [themeId, setThemeIdState] = React.useState(() => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    return isThemeId(savedTheme) ? savedTheme : defaultTheme;
+    return isThemeId(savedTheme) ? savedTheme : defaultThemeId;
   });
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const settingsRef = React.useRef<HTMLDivElement | null>(null);
-  const [filters, setFilters] = React.useState<Filters>({
-    project: 'all',
-    status: 'all',
-    phase: 'all',
-    search: '',
+  const [currentPersonId, setCurrentPersonIdState] = React.useState(() => {
+    const savedPersonId = localStorage.getItem(CURRENT_PERSON_STORAGE_KEY);
+    return savedPersonId ?? 'person-admin';
   });
-  const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
+  const [activeView, setActiveView] = React.useState<ViewId>(() => viewFromPath(window.location.pathname));
+  const currentUser = people.find((person) => person.id === currentPersonId) ?? people[0];
+  const activeTheme = themes.find((theme) => theme.id === themeId) ?? themes[0];
+  const activeProjects = projects.filter((project) => !project.archivedAt);
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
 
   React.useEffect(() => {
-    if (window.location.pathname !== '/tasks') {
-      window.history.replaceState(null, '', '/tasks');
+    if (!people.some((person) => person.id === currentPersonId)) {
+      setCurrentPersonIdState(people[0].id);
     }
-  }, []);
+  }, [currentPersonId, people]);
 
   React.useEffect(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+    localStorage.setItem(THEME_STORAGE_KEY, themeId);
+  }, [themeId]);
 
   React.useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      if (!settingsRef.current?.contains(event.target as Node)) {
-        setSettingsOpen(false);
-      }
-    };
+    localStorage.setItem(CURRENT_PERSON_STORAGE_KEY, currentPersonId);
+  }, [currentPersonId]);
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSettingsOpen(false);
-      }
-    };
+  React.useEffect(() => {
+    const nextPath = `/${activeView}`;
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState(null, '', nextPath);
+    }
+  }, [activeView]);
 
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+  React.useEffect(() => {
+    if (!canAccess(currentUser, activeView)) {
+      const firstAccessible = views.find((view) => canAccess(currentUser, view.id))?.id ?? 'tasks';
+      setActiveView(firstAccessible);
+    }
+  }, [activeView, currentUser]);
 
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, []);
-
-  const filteredTasks = React.useMemo(() => tasks.filter((task) => matchesFilters(task, filters)), [tasks, filters]);
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
-
-  const updateTask = (taskId: string, updater: (task: Task) => Task) => {
-    setTasks((currentTasks) => currentTasks.map((task) => (task.id === taskId ? updater(task) : task)));
+  const setThemeId = (nextThemeId: string) => {
+    if (isThemeId(nextThemeId)) {
+      setThemeIdState(nextThemeId);
+    }
   };
 
-  const setTaskComplete = (taskId: string, complete: boolean) => {
-    updateTask(taskId, (task) => ({
-      ...task,
-      status: complete ? 'done' : 'wip',
-      subtasks: task.subtasks.map((subtask) => ({ ...subtask, done: complete ? true : subtask.done })),
-    }));
+  const setCurrentPersonId = (personId: string) => {
+    setCurrentPersonIdState(personId);
   };
 
-  const toggleSubtask = (taskId: string, subtaskId: string) => {
-    updateTask(taskId, (task) => {
-      const subtasks = task.subtasks.map((subtask) =>
-        subtask.id === subtaskId ? { ...subtask, done: !subtask.done } : subtask,
-      );
-      const allDone = subtasks.length > 0 && subtasks.every((subtask) => subtask.done);
-      return {
-        ...task,
-        status: allDone ? 'done' : task.status === 'done' ? 'wip' : task.status,
-        subtasks,
-      };
+  const notifyTaskFollowers = (task: Task, message: string) => {
+    const date = new Date().toISOString().slice(0, 10);
+    setNotifications((current) => [
+      {
+        id: `notification-${current.length + 1}`,
+        taskId: task.id,
+        actor: currentUser.name,
+        date,
+        message,
+        read: false,
+      },
+      ...current,
+    ]);
+  };
+
+  const archiveTask = (taskId: string, message = 'Task archived') => {
+    const archivedAt = new Date().toISOString().slice(0, 10);
+    setTasks((current) => {
+      const task = current.find((candidate) => candidate.id === taskId);
+      if (!task) {
+        return current;
+      }
+      const archivedTask = { ...task, archivedAt };
+      setArchive((archiveState) => ({ ...archiveState, tasks: [archivedTask, ...archiveState.tasks] }));
+      notifyTaskFollowers(task, `${message}: ${task.title}`);
+      return current.filter((candidate) => candidate.id !== taskId);
     });
   };
 
+  const archiveSubtask = (taskId: string, subtaskId: string) => {
+    const archivedAt = new Date().toISOString().slice(0, 10);
+    setTasks((current) =>
+      current.map((task) => {
+        if (task.id !== taskId) {
+          return task;
+        }
+        const subtask = task.subtasks.find((candidate) => candidate.id === subtaskId);
+        if (!subtask) {
+          return task;
+        }
+        setArchive((archiveState) => ({
+          ...archiveState,
+          subtasks: [{ ...subtask, taskId: task.id, taskTitle: task.title, projectId: task.projectId, archivedAt }, ...archiveState.subtasks],
+        }));
+        notifyTaskFollowers(task, `Subtask archived: ${subtask.title}`);
+        return { ...task, subtasks: task.subtasks.filter((candidate) => candidate.id !== subtaskId) };
+      }),
+    );
+  };
+
+  const archiveProject = (projectId: string) => {
+    const project = projects.find((candidate) => candidate.id === projectId);
+    if (!project) {
+      return;
+    }
+    const confirmed = window.confirm(`${project.name} will be moved to Archive with its tasks and allocations. It can be restored later.`);
+    if (!confirmed) {
+      return;
+    }
+    const archivedAt = new Date().toISOString().slice(0, 10);
+    const projectTasks = tasks.filter((task) => task.projectId === projectId).map((task) => ({ ...task, archivedAt }));
+    const projectAllocations = allocations.filter((allocation) => allocation.projectId === projectId);
+    setArchive((current) => ({
+      projects: [{ ...project, archivedAt }, ...current.projects],
+      tasks: [...projectTasks, ...current.tasks],
+      subtasks: current.subtasks,
+      allocations: [...projectAllocations, ...current.allocations],
+    }));
+    projectTasks.forEach((task) => notifyTaskFollowers(task, `Project archived: ${project.name}`));
+    setProjects((current) => current.filter((candidate) => candidate.id !== projectId));
+    setTasks((current) => current.filter((task) => task.projectId !== projectId));
+    setAllocations((current) => current.filter((allocation) => allocation.projectId !== projectId));
+  };
+
+  const restoreProject = (projectId: string) => {
+    const project = archive.projects.find((candidate) => candidate.id === projectId);
+    if (!project) {
+      return;
+    }
+    const restoredProject = { ...project };
+    delete restoredProject.archivedAt;
+    const restoredTasks = archive.tasks
+      .filter((task) => task.projectId === projectId)
+      .map((task) => {
+        const restoredTask = { ...task };
+        delete restoredTask.archivedAt;
+        return restoredTask;
+      });
+    const restoredAllocations = archive.allocations.filter((allocation) => allocation.projectId === projectId);
+    setProjects((current) => [...current, restoredProject]);
+    setTasks((current) => [...current, ...restoredTasks]);
+    setAllocations((current) => [...current, ...restoredAllocations]);
+    setArchive((current) => ({
+      projects: current.projects.filter((candidate) => candidate.id !== projectId),
+      tasks: current.tasks.filter((task) => task.projectId !== projectId),
+      subtasks: current.subtasks,
+      allocations: current.allocations.filter((allocation) => allocation.projectId !== projectId),
+    }));
+    restoredTasks.forEach((task) => notifyTaskFollowers(task, `Project restored: ${project.name}`));
+  };
+
+  const restoreTask = (taskId: string) => {
+    const task = archive.tasks.find((candidate) => candidate.id === taskId);
+    if (!task || archive.projects.some((project) => project.id === task.projectId)) {
+      return;
+    }
+    const restoredTask = { ...task };
+    delete restoredTask.archivedAt;
+    setTasks((current) => [...current, restoredTask]);
+    setArchive((current) => ({ ...current, tasks: current.tasks.filter((candidate) => candidate.id !== taskId) }));
+    notifyTaskFollowers(restoredTask, `Task restored: ${restoredTask.title}`);
+  };
+
   return (
-    <main className={`relay-shell ${theme}`}>
-      <header className="topbar">
-        <div>
-          <p className="route-label">Relay / Tasks</p>
-          <h1>Relay Task Board</h1>
-        </div>
-        <div className="topbar-tools">
-          <div className="topbar-meta">
-            <span>{filteredTasks.length} visible</span>
-            <span>{tasks.length} seeded</span>
-          </div>
-          <div className="settings-menu" ref={settingsRef}>
-            <button
-              aria-expanded={settingsOpen}
-              aria-label="Open settings"
-              className="icon-button settings-trigger"
-              onClick={() => setSettingsOpen((open) => !open)}
-              type="button"
-            >
-              <Settings size={18} aria-hidden="true" />
-            </button>
-            {settingsOpen && (
-              <div className="settings-popover" role="menu">
-                <label>
-                  Theme
-                  <select
-                    aria-label="Theme"
-                    value={theme}
-                    onChange={(event) => setTheme(event.target.value as ThemeId)}
-                  >
-                    {themeOptions.map((themeOption) => (
-                      <option key={themeOption.id} value={themeOption.id}>
-                        {themeOption.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <section className="filters" aria-label="Task filters">
-        <label>
-          Project
-          <select
-            value={filters.project}
-            onChange={(event) => setFilters((current) => ({ ...current, project: event.target.value }))}
+    <main
+      className={`relay-shell theme-${activeTheme.id} ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}
+      data-theme={activeTheme.id}
+      style={themeStyle(activeTheme)}
+    >
+      <header className="app-header">
+        <button className="app-brand" onClick={() => setSidebarCollapsed(false)} type="button">
+          RELAY
+        </button>
+        <div className="app-notifications">
+          <button
+            aria-label="Notifications"
+            className="icon-button"
+            onClick={() => {
+              setNotificationsOpen((open) => !open);
+              setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+            }}
+            type="button"
           >
-            <option value="all">All projects</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Status
-          <select
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as Filters['status'] }))}
-          >
-            <option value="all">All statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {statusLabels[status]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Phase
-          <select
-            value={filters.phase}
-            onChange={(event) => setFilters((current) => ({ ...current, phase: event.target.value as Filters['phase'] }))}
-          >
-            <option value="all">All phases</option>
-            {phases.map((phase) => (
-              <option key={phase} value={phase}>
-                {phaseLabels[phase]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="search-field">
-          Search
-          <span>
-            <Search size={16} aria-hidden="true" />
-            <input
-              value={filters.search}
-              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              placeholder="Title, owner, notes"
-              type="search"
-            />
-          </span>
-        </label>
-      </section>
-
-      <section className="task-table" aria-label="Relay task table">
-        <div className="table-header" role="row">
-          <span>Done</span>
-          <span>Title</span>
-          <span>Status</span>
-          <span>Phase</span>
-          <span>Priority</span>
-          <span>Due</span>
-          <span>Assignee</span>
-          <span>Subtasks</span>
-        </div>
-
-        {statuses.map((status) => {
-          const groupTasks = filteredTasks.filter((task) => task.status === status);
-          return (
-            <section className="status-group" key={status} data-testid={`group-${status}`}>
-              <h2>
-                <span>{statusLabels[status]}</span>
-                <span>{groupTasks.length}</span>
-              </h2>
-              {groupTasks.length === 0 ? (
-                <p className="empty-row">No matching tasks</p>
+            <Bell size={16} aria-hidden="true" />
+            {unreadNotifications > 0 && <span>{unreadNotifications}</span>}
+          </button>
+          {notificationsOpen && (
+            <section className="notification-panel" aria-label="Task notifications">
+              {notifications.length === 0 ? (
+                <p>No task updates</p>
               ) : (
-                groupTasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    selected={task.id === selectedTaskId}
-                    onOpen={() => setSelectedTaskId(task.id)}
-                    onComplete={(complete) => setTaskComplete(task.id, complete)}
-                  />
+                notifications.map((notification) => (
+                  <article key={notification.id}>
+                    <strong>{notification.message}</strong>
+                    <span>{notification.actor} / {notification.date}</span>
+                  </article>
                 ))
               )}
             </section>
-          );
-        })}
-      </section>
-
-      <TaskPane
-        task={selectedTask}
-        projectName={projects.find((project) => project.id === selectedTask?.projectId)?.name ?? ''}
-        onClose={() => setSelectedTaskId(null)}
-        onComplete={(complete) => selectedTask && setTaskComplete(selectedTask.id, complete)}
-        onToggleSubtask={(subtaskId) => selectedTask && toggleSubtask(selectedTask.id, subtaskId)}
-      />
+          )}
+        </div>
+      </header>
+      <aside className="sidebar" aria-label="Primary navigation" onClick={() => sidebarCollapsed && setSidebarCollapsed(false)}>
+        <button
+          aria-label={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          className="sidebar-collapse"
+          onClick={(event) => {
+            event.stopPropagation();
+            setSidebarCollapsed((collapsed) => !collapsed);
+          }}
+          type="button"
+        >
+          {sidebarCollapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+        </button>
+        <section>
+          <h2>views</h2>
+          {views.map((view) => {
+            const Icon = view.icon;
+            const accessible = canAccess(currentUser, view.id);
+            return (
+              <button
+                className={activeView === view.id ? 'is-active' : ''}
+                disabled={!accessible}
+                key={view.id}
+                onClick={() => setActiveView(view.id)}
+                type="button"
+              >
+                <Icon size={14} aria-hidden />
+                <span>{view.label}</span>
+              {!accessible && <small>locked</small>}
+              </button>
+            );
+          })}
+        </section>
+        <section className="identity">
+          <h2>user</h2>
+          <p>{currentUser.name}</p>
+          <span>{currentUser.role}</span>
+        </section>
+      </aside>
+      <div className="content">
+        {activeView === 'projects' && (
+          <ProjectsView
+            currentUser={currentUser}
+            onArchiveProject={archiveProject}
+            onArchiveTask={archiveTask}
+            people={people}
+            projects={activeProjects}
+            setProjects={setProjects}
+            setTasks={setTasks}
+            tasks={tasks}
+          />
+        )}
+        {activeView === 'allocation' && (
+          <CalendarView
+            allocations={allocations}
+            currentUser={currentUser}
+            people={people}
+            projects={activeProjects}
+            setAllocations={setAllocations}
+            setTasks={setTasks}
+            tasks={tasks}
+          />
+        )}
+        {activeView === 'tasks' && (
+          <TaskView
+            currentUser={currentUser}
+            onArchiveSubtask={archiveSubtask}
+            onArchiveTask={archiveTask}
+            onTaskUpdated={notifyTaskFollowers}
+            people={people}
+            projects={activeProjects}
+            setTasks={setTasks}
+            tasks={tasks}
+          />
+        )}
+        {activeView === 'archive' && <ArchiveView archive={archive} currentUser={currentUser} onRestoreProject={restoreProject} onRestoreTask={restoreTask} />}
+        {activeView === 'people' && <PeopleView currentUser={currentUser} people={people} setPeople={setPeople} />}
+        {activeView === 'settings' && (
+          <SettingsView
+            currentPersonId={currentPersonId}
+            currentUser={currentUser}
+            people={people}
+            setCurrentPersonId={setCurrentPersonId}
+            setThemeId={setThemeId}
+            themeId={themeId}
+          />
+        )}
+      </div>
     </main>
   );
 }
 
-function TaskRow({
-  task,
-  selected,
-  onOpen,
-  onComplete,
-}: {
-  task: Task;
-  selected: boolean;
-  onOpen: () => void;
-  onComplete: (complete: boolean) => void;
-}) {
-  const progress = progressFor(task);
-  const percent = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
-
-  return (
-    <button
-      className={`task-row ${selected ? 'is-selected' : ''}`}
-      data-testid={`task-row-${task.id}`}
-      onClick={onOpen}
-      type="button"
-    >
-      <span className="check-cell" onClick={(event) => event.stopPropagation()}>
-        <input
-          aria-label={`Complete ${task.title}`}
-          checked={task.status === 'done'}
-          onChange={(event) => onComplete(event.target.checked)}
-          type="checkbox"
-        />
-      </span>
-      <span className="title-cell">
-        <strong>{task.title}</strong>
-        <small>{task.description}</small>
-      </span>
-      <span className={`pill status-${task.status}`}>{statusLabels[task.status]}</span>
-      <span>{phaseLabels[task.phase]}</span>
-      <span className={`priority priority-${task.priority}`}>{priorityLabels[task.priority]}</span>
-      <span>{task.dueDate}</span>
-      <span>{task.assignee}</span>
-      <span className="progress-cell" data-testid={`progress-${task.id}`}>
-        <span>{progress.done}/{progress.total}</span>
-        <span className="progress-track" aria-hidden="true">
-          <span style={{ width: `${percent}%` }} />
-        </span>
-      </span>
-      <ChevronRight className="row-chevron" size={16} aria-hidden="true" />
-    </button>
-  );
-}
-
-function TaskPane({
-  task,
-  projectName,
-  onClose,
-  onComplete,
-  onToggleSubtask,
-}: {
-  task: Task | null;
-  projectName: string;
-  onClose: () => void;
-  onComplete: (complete: boolean) => void;
-  onToggleSubtask: (subtaskId: string) => void;
-}) {
-  const progress = task ? progressFor(task) : { done: 0, total: 0 };
-
-  return (
-    <>
-      <div className={`pane-scrim ${task ? 'is-open' : ''}`} onClick={onClose} />
-      <aside className={`task-pane ${task ? 'is-open' : ''}`} aria-label="Task pane" data-testid="task-pane">
-        {task && (
-          <>
-            <header className="pane-header">
-              <button aria-label="Close task pane" className="icon-button" onClick={onClose} type="button">
-                <PanelRightClose size={18} aria-hidden="true" />
-              </button>
-              <div>
-                <p>{projectName}</p>
-                <h2>{task.title}</h2>
-              </div>
-            </header>
-
-            <div className="pane-actions">
-              {task.status === 'done' ? (
-                <button className="secondary-action" onClick={() => onComplete(false)} type="button">
-                  <RotateCcw size={16} aria-hidden="true" />
-                  Undo to WIP
-                </button>
-              ) : (
-                <button className="primary-action" onClick={() => onComplete(true)} type="button">
-                  <CheckCircle2 size={16} aria-hidden="true" />
-                  Mark complete
-                </button>
-              )}
-            </div>
-
-            <dl className="pane-meta">
-              <div>
-                <dt>Status</dt>
-                <dd className={`pill status-${task.status}`}>{statusLabels[task.status]}</dd>
-              </div>
-              <div>
-                <dt>Phase</dt>
-                <dd>{phaseLabels[task.phase]}</dd>
-              </div>
-              <div>
-                <dt>Priority</dt>
-                <dd className={`priority priority-${task.priority}`}>{priorityLabels[task.priority]}</dd>
-              </div>
-              <div>
-                <dt>Due</dt>
-                <dd>{task.dueDate}</dd>
-              </div>
-              <div>
-                <dt>Assignee</dt>
-                <dd>{task.assignee}</dd>
-              </div>
-            </dl>
-
-            <section className="pane-section">
-              <h3>Details</h3>
-              <p>{task.description}</p>
-            </section>
-
-            <section className="pane-section">
-              <div className="section-title">
-                <h3>Subtasks</h3>
-                <span data-testid="pane-progress">{progress.done}/{progress.total}</span>
-              </div>
-              <div className="subtasks">
-                {task.subtasks.map((subtask) => (
-                  <label key={subtask.id} className="subtask">
-                    <input
-                      checked={subtask.done}
-                      data-testid={`subtask-${subtask.id}`}
-                      onChange={() => onToggleSubtask(subtask.id)}
-                      type="checkbox"
-                    />
-                    {subtask.done ? <CheckCircle2 size={17} aria-hidden="true" /> : <Circle size={17} aria-hidden="true" />}
-                    <span>{subtask.title}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-      </aside>
-    </>
-  );
+function viewFromPath(pathname: string): ViewId {
+  const candidate = pathname.replace('/', '') as ViewId;
+  return views.some((view) => view.id === candidate) ? candidate : 'tasks';
 }
 
 createRoot(document.getElementById('root')!).render(
