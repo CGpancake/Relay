@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client';
 import {
   Archive,
   Bell,
+  BookOpenText,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
+  Handshake,
   ListChecks,
   Settings,
   Users,
@@ -14,24 +16,29 @@ import {
 } from 'lucide-react';
 import { ArchiveView } from './components/ArchiveView';
 import { CalendarView } from './components/CalendarView';
+import { DocumentationView } from './components/DocumentationView';
 import { PeopleView, SettingsView } from './components/PeopleSettings';
 import { ProjectsView } from './components/ProjectsView';
+import { StudioLogo } from './components/StudioLogo';
 import { TaskView } from './components/TaskView';
 import { createSeedAllocations, createSeedPeople, createSeedProjects, createSeedTasks } from './data/seed';
 import { canAccess } from './lib/permissions';
-import { defaultThemeId, isThemeId, themes, themeStyle } from './themes';
+import { defaultAccentKey, defaultThemeId, isAccentKey, isThemeId, themes, themeStyle } from './themes';
 import type { ArchiveState, Task, TaskNotification, ViewId } from './types';
 import './styles.css';
 
 const RELAY_STORAGE_KEY = 'relay:first-slice:ephemeral';
 const THEME_STORAGE_KEY = 'relay:theme';
+const ACCENT_STORAGE_KEY = 'relay:accent-key';
 const CURRENT_PERSON_STORAGE_KEY = 'relay:current-person';
 
 const views: Array<{ id: ViewId; label: string; icon: LucideIcon }> = [
   { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'allocation', label: 'Allocation', icon: CalendarDays },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
+  { id: 'bidding', label: 'Bidding', icon: Handshake },
   { id: 'archive', label: 'Archive', icon: Archive },
+  { id: 'documentation', label: 'Documentation', icon: BookOpenText },
   { id: 'people', label: 'People', icon: Users },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -51,6 +58,10 @@ function App() {
   const [themeId, setThemeIdState] = React.useState(() => {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
     return isThemeId(savedTheme) ? savedTheme : defaultThemeId;
+  });
+  const [accentKey, setAccentKeyState] = React.useState(() => {
+    const savedAccentKey = localStorage.getItem(ACCENT_STORAGE_KEY);
+    return isAccentKey(savedAccentKey) ? savedAccentKey : defaultAccentKey;
   });
   const [currentPersonId, setCurrentPersonIdState] = React.useState(() => {
     const savedPersonId = localStorage.getItem(CURRENT_PERSON_STORAGE_KEY);
@@ -73,6 +84,10 @@ function App() {
   }, [themeId]);
 
   React.useEffect(() => {
+    localStorage.setItem(ACCENT_STORAGE_KEY, accentKey);
+  }, [accentKey]);
+
+  React.useEffect(() => {
     localStorage.setItem(CURRENT_PERSON_STORAGE_KEY, currentPersonId);
   }, [currentPersonId]);
 
@@ -93,6 +108,12 @@ function App() {
   const setThemeId = (nextThemeId: string) => {
     if (isThemeId(nextThemeId)) {
       setThemeIdState(nextThemeId);
+    }
+  };
+
+  const setAccentKey = (nextAccentKey: string) => {
+    if (isAccentKey(nextAccentKey)) {
+      setAccentKeyState(nextAccentKey);
     }
   };
 
@@ -217,11 +238,12 @@ function App() {
     <main
       className={`relay-shell theme-${activeTheme.id} ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}
       data-theme={activeTheme.id}
-      style={themeStyle(activeTheme)}
+      style={themeStyle(activeTheme, accentKey)}
     >
       <header className="app-header">
-        <button className="app-brand" onClick={() => setSidebarCollapsed(false)} type="button">
-          RELAY
+        <button className="app-brand" aria-label="Alongside Global RELAY" onClick={() => setSidebarCollapsed(false)} type="button">
+          <StudioLogo id="alongside" title="Alongside Global" className="brand-logo" />
+          <span className="sr-only">RELAY</span>
         </button>
         <div className="app-notifications">
           <button
@@ -326,13 +348,17 @@ function App() {
             tasks={tasks}
           />
         )}
+        {activeView === 'bidding' && <BiddingView />}
         {activeView === 'archive' && <ArchiveView archive={archive} currentUser={currentUser} onRestoreProject={restoreProject} onRestoreTask={restoreTask} />}
+        {activeView === 'documentation' && <DocumentationView />}
         {activeView === 'people' && <PeopleView currentUser={currentUser} people={people} setPeople={setPeople} />}
         {activeView === 'settings' && (
           <SettingsView
+            accentKey={accentKey}
             currentPersonId={currentPersonId}
             currentUser={currentUser}
             people={people}
+            setAccentKey={setAccentKey}
             setCurrentPersonId={setCurrentPersonId}
             setThemeId={setThemeId}
             themeId={themeId}
@@ -340,6 +366,15 @@ function App() {
         )}
       </div>
     </main>
+  );
+}
+
+function BiddingView() {
+  return (
+    <section className="placeholder-view" aria-label="Bidding">
+      <p className="eyebrow">Relay / Bidding</p>
+      <h1>bidding</h1>
+    </section>
   );
 }
 

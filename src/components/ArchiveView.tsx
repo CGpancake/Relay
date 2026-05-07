@@ -135,9 +135,8 @@ export function ArchiveView({
             <p className="empty-row">No archived projects</p>
           ) : (
             filteredProjects.map((project) => (
-              <article className="archive-row" data-testid={`archive-project-${project.id}`} key={project.id}>
-                <strong>{project.code}</strong>
-                <span>{project.name}</span>
+              <article className="archive-row archive-project-row" data-testid={`archive-project-${project.id}`} key={project.id}>
+                <strong>{project.name}</strong>
                 <small>{project.tags.join(', ')} / {project.tools.join(', ')}</small>
                 <button className="secondary-action" onClick={() => onRestoreProject(project.id)} type="button">
                   <RotateCcw size={15} aria-hidden="true" />

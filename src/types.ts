@@ -43,11 +43,20 @@ export type Task = {
   comments: TaskComment[];
 };
 
-export type ProjectTag = 'print' | 'cg' | 'ai';
-export type ProjectTool = 'Houdini' | 'Comfy' | 'Nanobanana' | 'Blender' | 'Unreal';
+export type ProjectTag = 'print' | 'cg' | 'ai' | 'retouch';
+export type ProjectTool = 'Houdini' | 'Comfy' | 'Nanobanana' | 'Blender' | 'Unreal' | 'Photoshop';
+export type StudioId = 'bonfire' | 'saddington-baynes' | 'sombra-labs' | 'hero-next-door' | 'organs';
+
+export type Studio = {
+  id: StudioId;
+  name: string;
+  shortName: string;
+  logo: string;
+};
 
 export type Project = {
   id: string;
+  studioId: StudioId;
   name: string;
   code: string;
   tags: ProjectTag[];
@@ -56,7 +65,7 @@ export type Project = {
 };
 
 export type PermissionLevel = 'Admin' | 'Manager' | 'Artist' | 'Client';
-export type ViewId = 'projects' | 'allocation' | 'tasks' | 'archive' | 'people' | 'settings';
+export type ViewId = 'projects' | 'allocation' | 'tasks' | 'bidding' | 'archive' | 'documentation' | 'people' | 'settings';
 
 export type Permissions = Record<ViewId, boolean>;
 

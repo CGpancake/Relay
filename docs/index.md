@@ -2,6 +2,8 @@
 
 This wiki records implementation memory for the first slice of Relay.
 
+Human-readable product documentation for the in-app wiki lives in `Documentation/`. Keep this `docs/` folder concise and implementation-oriented for agents and developers.
+
 ## Start Here
 
 - [[project-overview]] - product intent, first-slice scope, and non-goals.
@@ -9,6 +11,7 @@ This wiki records implementation memory for the first slice of Relay.
 - [[implementation-log]] - chronological notes about what was implemented and why.
 - [[testing-debug-guide]] - how to verify behavior and debug common issues.
 - [[glossary]] - shared terms used in the prototype.
+- [[scoro-metadata-intake]] - safe Scoro project metadata fixture and gap-report workflow.
 
 ## Current Slice
 

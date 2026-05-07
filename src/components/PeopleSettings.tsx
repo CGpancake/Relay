@@ -2,8 +2,9 @@ import React from 'react';
 import { Plus } from 'lucide-react';
 import { permissionLevels, viewIds, viewLabels } from '../data/labels';
 import { canAdminPeople, permissionsForPermissionLevel } from '../lib/permissions';
-import { themes, themeVariantForMode } from '../themes';
+import { themeAccentChoices, themes, themeVariantForMode } from '../themes';
 import type { PermissionLevel, Person } from '../types';
+import type { ThemeAccentKey } from '../themes';
 
 export function PeopleView({
   currentUser,
@@ -177,22 +178,27 @@ export function PeopleView({
 }
 
 export function SettingsView({
+  accentKey,
   currentPersonId,
   currentUser,
   people,
+  setAccentKey,
   setCurrentPersonId,
   setThemeId,
   themeId,
 }: {
+  accentKey: ThemeAccentKey;
   currentPersonId: string;
   currentUser: Person;
   people: Person[];
+  setAccentKey: (accentKey: string) => void;
   setCurrentPersonId: (personId: string) => void;
   setThemeId: (themeId: string) => void;
   themeId: string;
 }) {
   const lightTheme = themeVariantForMode(themeId, 'light');
   const darkTheme = themeVariantForMode(themeId, 'dark');
+  const selectedTheme = themes.find((theme) => theme.id === themeId) ?? themes[0];
 
   return (
     <>
@@ -243,6 +249,24 @@ export function SettingsView({
               ))}
             </select>
           </label>
+          <fieldset className="accent-picker">
+            <legend>Main accent</legend>
+            <div className="accent-swatch-grid">
+              {themeAccentChoices(selectedTheme).map((choice) => (
+                <button
+                  aria-label={`Use ${choice.label} accent`}
+                  className={choice.key === accentKey ? 'is-active' : ''}
+                  key={choice.key}
+                  onClick={() => setAccentKey(choice.key)}
+                  style={{ '--swatch-color': choice.color } as React.CSSProperties}
+                  title={choice.label}
+                  type="button"
+                >
+                  <span aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          </fieldset>
         </section>
         <section>
           <h2>prototype user</h2>

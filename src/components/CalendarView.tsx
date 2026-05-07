@@ -231,8 +231,7 @@ export function CalendarView({
                             data-testid={`calendar-project-row-${person.id}-${projectId}`}
                             style={{ '--project-color': projectColor } as React.CSSProperties}
                           >
-                            <span>{project?.code}</span>
-                            <small>{project?.name}</small>
+                            <span>{project?.name}</span>
                           </div>
                           {dates.map((date) => {
                             const cell: AllocationSelectionCell = { personId: person.id, date, rowType: 'project', projectId };
@@ -273,7 +272,7 @@ export function CalendarView({
                               >
                                 {hasAllocation && (
                                   <span className={`allocation-band status-${dominantStatus(projectAllocations)}`}>
-                                    <span>{project?.code}</span>
+                                    <span>{project?.name}</span>
                                     {' '}
                                     <strong>{projectHours}h</strong>
                                   </span>

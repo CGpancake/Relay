@@ -23,6 +23,14 @@ export type ThemeDefinition = {
   };
 };
 
+export type ThemeAccentChoice = {
+  key: ThemeAccentKey;
+  color: string;
+  label: string;
+};
+
+export type ThemeAccentKey = 'active' | 'danger' | 'success' | 'pending' | 'special' | 'neutral';
+
 const nativeTheme = (
   id: string,
   name: string,
@@ -134,9 +142,23 @@ export const themes: ThemeDefinition[] = [
   communityTheme('modus-operandi', 'Modus Operandi', 'light', '#ffffff', '#000000', '#505050', '#a0a0a0', 'rgba(0,0,0,.10)', 'rgba(0,0,0,.22)', '#7d500a', '#a60000', '#005f00', '#0030a6', '#5f3ecf'),
 ];
 
-export const defaultThemeId = 'concrete-light';
+export const defaultThemeId = 'concrete-dim';
+
+export const defaultAccentKey: ThemeAccentKey = 'active';
+
+export const themeAccentChoices = (theme: ThemeDefinition): ThemeAccentChoice[] => [
+  { key: 'active', color: theme.tokens.active, label: 'Primary' },
+  { key: 'danger', color: theme.tokens.danger, label: 'Warm' },
+  { key: 'success', color: theme.tokens.success, label: 'Positive' },
+  { key: 'pending', color: theme.tokens.pending, label: 'Cool' },
+  { key: 'special', color: theme.tokens.special, label: 'Special' },
+  { key: 'neutral', color: theme.tokens.ink2, label: 'Neutral' },
+];
 
 export const isThemeId = (value: string | null): value is string => themes.some((theme) => theme.id === value);
+
+export const isAccentKey = (value: string | null): value is ThemeAccentKey =>
+  value === 'active' || value === 'danger' || value === 'success' || value === 'pending' || value === 'special' || value === 'neutral';
 
 export const themeVariantForMode = (themeId: string, mode: ThemeMode) => {
   const currentTheme = themes.find((theme) => theme.id === themeId);
@@ -147,7 +169,7 @@ export const themeVariantForMode = (themeId: string, mode: ThemeMode) => {
   return themes.find((theme) => theme.family === currentTheme.family && theme.mode === mode);
 };
 
-export const themeStyle = (theme: ThemeDefinition) =>
+export const themeStyle = (theme: ThemeDefinition, accentKey: ThemeAccentKey = defaultAccentKey) =>
   ({
     '--bg': theme.tokens.bg,
     '--ink': theme.tokens.ink,
@@ -155,7 +177,7 @@ export const themeStyle = (theme: ThemeDefinition) =>
     '--ink-3': theme.tokens.ink3,
     '--line': theme.tokens.line,
     '--line-s': theme.tokens.lineS,
-    '--color-active': theme.tokens.active,
+    '--color-active': themeAccentChoices(theme).find((choice) => choice.key === accentKey)?.color ?? theme.tokens.active,
     '--color-danger': theme.tokens.danger,
     '--color-success': theme.tokens.success,
     '--color-pending': theme.tokens.pending,

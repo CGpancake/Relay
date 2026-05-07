@@ -1,8 +1,10 @@
 import React from 'react';
-import { Archive, ListPlus, Plus, Trash2 } from 'lucide-react';
+import { Archive, ChevronDown, ChevronRight, ListPlus, Plus, Trash2 } from 'lucide-react';
 import { phases, phaseLabels, priorities, priorityLabels, projectTags, projectTools } from '../data/labels';
+import { studios, studioById } from '../data/studios';
 import { canCreateProject } from '../lib/permissions';
-import type { Person, Project, ProjectTag, ProjectTool, Task, TaskPhase, TaskPriority } from '../types';
+import type { Person, Project, ProjectTag, ProjectTool, StudioId, Task, TaskPhase, TaskPriority } from '../types';
+import { StudioLogo } from './StudioLogo';
 
 const todayIso = () => {
   const now = new Date();
@@ -26,6 +28,23 @@ const reviewVersionsFor = (taskId: string, title: string) => [
   },
 ];
 
+const projectCodeFromName = (name: string) => {
+  const compact = name
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('');
+  const fallback = name.replace(/[^a-z0-9]/gi, '');
+  return (compact || fallback || 'PROJECT').slice(0, 8).toUpperCase();
+};
+
+const projectIdFromName = (name: string, count: number) => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
+  return `${slug}-${count + 1}`;
+};
+
 export function ProjectsView({
   currentUser,
   people,
@@ -48,9 +67,10 @@ export function ProjectsView({
   const editable = canCreateProject(currentUser);
   const [selectedProjectId, setSelectedProjectId] = React.useState(projects[0]?.id ?? '');
   const [projectName, setProjectName] = React.useState('');
-  const [projectCode, setProjectCode] = React.useState('');
+  const [newProjectStudioId, setNewProjectStudioId] = React.useState<StudioId>(studios[0].id);
   const [newProjectTags, setNewProjectTags] = React.useState<ProjectTag[]>(['cg']);
   const [newProjectTools, setNewProjectTools] = React.useState<ProjectTool[]>(['Blender']);
+  const [collapsedStudioIds, setCollapsedStudioIds] = React.useState<StudioId[]>(() => studios.map((studio) => studio.id));
   const [taskTitle, setTaskTitle] = React.useState('');
   const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
   const [assignee, setAssignee] = React.useState(people[0]?.name ?? '');
@@ -73,20 +93,20 @@ export function ProjectsView({
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? projects[0];
   const projectTasks = selectedProject ? tasks.filter((task) => task.projectId === selectedProject.id) : [];
+  const selectedStudio = selectedProject ? studioById(selectedProject.studioId) : undefined;
 
   const addProject = () => {
     const name = projectName.trim();
-    const code = projectCode.trim().toUpperCase();
-    if (!editable || name.length === 0 || code.length === 0) {
+    if (!editable || name.length === 0 || !newProjectStudioId) {
       return;
     }
 
-    const id = `${code.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'project'}-${projects.length + 1}`;
-    const nextProject = { id, name, code, tags: newProjectTags, tools: newProjectTools };
+    const id = projectIdFromName(name, projects.length);
+    const code = projectCodeFromName(name);
+    const nextProject = { id, studioId: newProjectStudioId, name, code, tags: newProjectTags, tools: newProjectTools };
     setProjects((current) => [...current, nextProject]);
     setSelectedProjectId(id);
     setProjectName('');
-    setProjectCode('');
   };
 
   const updateProject = (projectId: string, updater: (project: Project) => Project) => {
@@ -94,6 +114,10 @@ export function ProjectsView({
       return;
     }
     setProjects((current) => current.map((project) => (project.id === projectId ? updater(project) : project)));
+  };
+
+  const toggleStudio = (studioId: StudioId) => {
+    setCollapsedStudioIds((current) => (current.includes(studioId) ? current.filter((id) => id !== studioId) : [...current, studioId]));
   };
 
   const addTask = () => {
@@ -115,7 +139,7 @@ export function ProjectsView({
           priority,
           dueDate,
           assignee,
-          description: `${selectedProject.code} task created from Projects.`,
+          description: `${selectedProject.name} task created from Projects.`,
           clientVisible,
           subtasks: [],
           reviewVersions: reviewVersionsFor(taskId, title),
@@ -154,21 +178,48 @@ export function ProjectsView({
 
       <section className="projects-layout">
         <div className="projects-list" aria-label="Project list">
-          {projects.map((project) => {
-            const taskCount = tasks.filter((task) => task.projectId === project.id).length;
+          {studios.map((studio) => {
+            const studioProjects = projects.filter((project) => project.studioId === studio.id);
+            const collapsed = collapsedStudioIds.includes(studio.id);
             return (
-              <button
-                className={project.id === selectedProject?.id ? 'is-selected' : ''}
-                data-testid={`project-row-${project.id}`}
-                key={project.id}
-                onClick={() => setSelectedProjectId(project.id)}
-                type="button"
-              >
-                <strong>{project.code}</strong>
-                <span>{project.name}</span>
-                <small>{taskCount} tasks</small>
-                <small>{project.tags.join(', ')} / {project.tools.join(', ')}</small>
-              </button>
+              <section className="studio-project-group" data-testid={`studio-group-${studio.id}`} key={studio.id}>
+                <button
+                  aria-expanded={!collapsed}
+                  className="studio-group-header"
+                  data-testid={`studio-toggle-${studio.id}`}
+                  onClick={() => toggleStudio(studio.id)}
+                  type="button"
+                >
+                  {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+                  <StudioLogo id={studio.id} title={`${studio.name} logo`} className="studio-logo" />
+                  <span>{studio.name}</span>
+                  <small>{studioProjects.length} projects</small>
+                </button>
+                {!collapsed && (
+                  <div className="studio-projects" data-testid={`studio-projects-${studio.id}`}>
+                    {studioProjects.length === 0 ? (
+                      <p className="empty-row">No projects</p>
+                    ) : (
+                      studioProjects.map((project) => {
+                        const taskCount = tasks.filter((task) => task.projectId === project.id).length;
+                        return (
+                          <button
+                            className={project.id === selectedProject?.id ? 'is-selected' : ''}
+                            data-testid={`project-row-${project.id}`}
+                            key={project.id}
+                            onClick={() => setSelectedProjectId(project.id)}
+                            type="button"
+                          >
+                            <strong>{project.name}</strong>
+                            <small>{taskCount} tasks</small>
+                            <small>{project.tags.join(', ')} / {project.tools.join(', ')}</small>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </section>
             );
           })}
         </div>
@@ -177,10 +228,24 @@ export function ProjectsView({
           {selectedProject && (
             <>
               <header>
-                <p className="eyebrow">{selectedProject.code}</p>
+                <p className="eyebrow">{selectedStudio?.name}</p>
                 <h2>{selectedProject.name}</h2>
               </header>
               <section className="metadata-editor" aria-label="Project metadata">
+                <label className="metadata-select">
+                  Studio
+                  <select
+                    disabled={!editable}
+                    onChange={(event) => updateProject(selectedProject.id, (project) => ({ ...project, studioId: event.target.value as StudioId }))}
+                    value={selectedProject.studioId}
+                  >
+                    {studios.map((studio) => (
+                      <option key={studio.id} value={studio.id}>
+                        {studio.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <MultiSelect
                   disabled={!editable}
                   label="Tags"
@@ -279,12 +344,18 @@ export function ProjectsView({
             <input value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={!editable} />
           </label>
           <label>
-            Code
-            <input maxLength={8} value={projectCode} onChange={(event) => setProjectCode(event.target.value)} disabled={!editable} />
+            Studio
+            <select value={newProjectStudioId} onChange={(event) => setNewProjectStudioId(event.target.value as StudioId)} disabled={!editable} required>
+              {studios.map((studio) => (
+                <option key={studio.id} value={studio.id}>
+                  {studio.name}
+                </option>
+              ))}
+            </select>
           </label>
           <MultiSelect disabled={!editable} label="Tags" options={projectTags} values={newProjectTags} onChange={(value) => setNewProjectTags(value as ProjectTag[])} />
           <MultiSelect disabled={!editable} label="Tools" options={projectTools} values={newProjectTools} onChange={(value) => setNewProjectTools(value as ProjectTool[])} />
-          <button className="primary-action" disabled={!editable || projectName.trim().length === 0 || projectCode.trim().length === 0} onClick={addProject} type="button">
+          <button className="primary-action" disabled={!editable || projectName.trim().length === 0 || !newProjectStudioId} onClick={addProject} type="button">
             <Plus size={15} aria-hidden="true" />
             Add project
           </button>
