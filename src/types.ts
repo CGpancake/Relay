@@ -65,7 +65,19 @@ export type Project = {
 };
 
 export type PermissionLevel = 'Admin' | 'Manager' | 'Artist' | 'Client';
-export type ViewId = 'projects' | 'allocation' | 'tasks' | 'bidding' | 'archive' | 'documentation' | 'people' | 'settings';
+export type ViewId =
+  | 'projects'
+  | 'calendar'
+  | 'tasks'
+  | 'bidding'
+  | 'archive'
+  | 'documentation'
+  | 'people'
+  | 'settings';
+
+export type CalendarMode = 'allocation' | 'time-off' | 'milestones';
+export type CalendarOverlaySettings = Record<CalendarMode, boolean>;
+export type CalendarDayWindowSettings = { pastHours: number; upcomingHours: number };
 
 export type Permissions = Record<ViewId, boolean>;
 
@@ -85,10 +97,29 @@ export type Allocation = {
   personId: string;
   projectId: string;
   date: string;
-  hours: number;
+  startMinute: number;
+  endMinute: number;
   status: AllocationStatus;
   notes: string;
 };
+
+export type TimeOffType = 'holiday' | 'sick-leave';
+export type TimeOffStatus = 'pending' | 'confirmed';
+
+export type TimeOffEntry = {
+  id: string;
+  personId: string;
+  date: string;
+  startMinute: number;
+  endMinute: number;
+  type: TimeOffType;
+  status: TimeOffStatus;
+  notes?: string;
+};
+
+export type BookingType = TimeOffType;
+export type BookingStatus = TimeOffStatus;
+export type Booking = TimeOffEntry;
 
 export type AllocationView = 'day' | 'week' | 'month' | 'year';
 
@@ -97,6 +128,7 @@ export type AllocationSelectionCell = {
   date: string;
   rowType: 'summary' | 'project';
   projectId?: string;
+  allocationId?: string;
 };
 
 export type ArchivedSubtask = Subtask & {

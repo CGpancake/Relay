@@ -136,6 +136,71 @@ Verification:
 - `npm run test:smoke` passed with 17 Playwright smoke tests after the feature implementation.
 - `npm run build` passed again after app header/sidebar alignment fixes.
 
+## 2026-05-13
+
+Implemented allocation time planning, internal placeholders, timezone settings, and documentation updates.
+
+Areas touched:
+
+- Shared view, permission, and allocation types.
+- App navigation and route handling.
+- Settings, Allocation, People permissions, seed data, CSS, smoke tests, internal docs, and in-app Documentation pages.
+
+Behavior changed:
+
+- Added Milestones and Time Off placeholder routes and sidebar entries.
+- Restricted Milestones and Time Off to Admin, Manager, and Artist permission levels; Clients cannot access them.
+- Added a Settings timezone value, defaulted from the browser timezone and persisted in `localStorage`.
+- Migrated seed allocations from stored `hours` to 15-minute snapped `startMinute` and `endMinute` timed segments while preserving total demo durations.
+- Reworked Allocation Day view into a 24-hour timeline with current-time marker, partial today striping, drag-create, block move/resize, block selection, and right-click edit/delete actions.
+- Kept Week, Month, and Year as compact panel-driven grids.
+- Changed compact summary cells to hide numeric hour text and render project utilization fills against fixed 8-hour capacity, with overbook treatment.
+- Changed the selected-cells panel into a selected-time segment editor that can append multiple timed segments to selected cells or update explicit selected blocks.
+- Kept capacity fixed at 8 hours per person/day until Time Off behavior is specified.
+- Promoted Time Off from placeholder to a leave-first calendar surface for holiday and sick leave.
+- Added time off approval state: artist-created time off start pending, Admin/Manager-created time off start confirmed, and Managers/Admins can confirm or revert selected time off.
+- Shared calendar semantics between Allocation and Time Off: date toolbar, compact rows, day timeline, past-time hatching, time off overlays, and allocation/project source context.
+- Kept Time Off visual-only for capacity; Allocation utilization still uses fixed 8-hour person/day capacity.
+- Allowed Artists to edit only their own allocation segments/statuses while Managers/Admins can edit all allocation plans.
+- Fixed project add dropdown stacking so compact project pickers stay readable above calendar rows.
+
+Verification:
+
+- `npm run build` passed during implementation before documentation updates.
+- `npm run build` passed after time off approval and shared calendar refinements.
+
+Refined the final time off/calendar marking contract.
+
+Behavior changed:
+
+- New time off now start pending for Artists, Managers, and Admins.
+- Manager/Admin approval actions are contextual: pending selections show Confirm, confirmed selections show Revert to pending, and mixed selections show both.
+- Compact booked cells select the time off stripes in that cell so Managers/Admins can confirm from compact views.
+- Time Off overlap validation now blocks holiday/sick-leave time off that overlap for the same person, date, and time range; adjacent non-overlapping ranges remain allowed.
+- Compact time off stripes now fill the full cell in Time Off and Allocation; Day time off stripes fill the full row height across their timed range.
+- Pending and confirmed time off share stripe geometry. Pending uses translucent bands, while confirmed uses full-strength bands.
+- Time Off now uses the same past-time hatch behavior as Allocation in compact and Day views.
+- Selection and hover use flat accent washes below time off/allocation context; hover is stronger than selection and does not use hatching.
+
+Refined the unified Calendar polish pass.
+
+- Moved Calendar overlay defaults to Settings under time planning and persisted them in local storage.
+- Kept Calendar mode buttons in the Calendar header, with the active mode overlay forced visible.
+- Simplified the Allocation editor summary area and made Calendar person sublabels show only position.
+- Restyled Day view linework to better match compact calendar rows and moved overbooking hatches below project allocation identity.
+
+Refined Calendar timing and layout behavior.
+
+- Changed compact project rows to render one positioned allocation segment per timed record, labelled with segment duration only.
+- Derived a clamped shared label column from visible person/project names, including folded project rows, so week/month/year grids fit without bottom horizontal drag scrolling.
+- Anchored past-time, Time Off, and overbooking hatching to the same stripe phase while keeping overbooking below allocation visuals and preserving holiday blue/sick-leave green/overbooking red.
+- Added persisted Day view past/upcoming padding settings under time planning. Defaults are 2 past hours and 10 upcoming hours; today uses a now-relative window and non-today dates default to 09:00-21:00.
+
+Verification planned for this refinement:
+
+- `npm run build`
+- `npm run test:smoke`
+
 ## Notes For Future Updates
 
 When implementation changes, update this log with:

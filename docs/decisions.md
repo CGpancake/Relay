@@ -1,5 +1,28 @@
 # Decisions
 
+### Unified Calendar route and Time Off terminology
+
+Decision: Replace the separate Allocation, Bookings, and Goals and Milestones sidebar entries with one Calendar entry at `/calendar`. Calendar mode is deep-linked with `mode=allocation`, `mode=time-off`, or `mode=milestones`; legacy `/allocation`, `/bookings`, and `/goals` paths resolve to the matching Calendar mode.
+
+Rationale: Producers need one planning surface where allocation, time off, and future milestone layers can be compared without navigating between separate views. The active mode controls the right-side editor, while Settings controls default visible calendar layers. The active mode overlay is always on. Milestones is intentionally placeholder-only until milestone data is defined.
+
+Consequences:
+- Bookings is now named Time Off in product language, labels, tests, and user-facing documentation.
+- Calendar access is granted when a user can access at least one calendar mode. Mode permissions remain distinct in behavior.
+- Time Off remains visual-only for allocation capacity. Allocation still uses the fixed 8-hour person/day capacity.
+- Time Off and overbooking use the same hatch geometry. Holiday is blue, sick leave is green, and overbooking is red.
+
+### Calendar polish and overlay settings
+
+Decision: Keep Calendar mode switching in the Calendar header, but move overlay visibility defaults to Settings under time planning.
+
+Rationale: Mode switching is an in-context editing choice, while overlay visibility is a display preference that should persist with other planning settings. Moving overlay defaults out of the Calendar reduces clutter and keeps the top of the planning surface focused on mode and date navigation.
+
+Consequences:
+- Settings owns default visibility for Allocation and Time Off overlays. Milestones remains a disabled placeholder overlay.
+- Calendar still forces the active mode overlay on at render time, even when the saved default for that overlay is off.
+- Calendar rows size to visible content, person sublabels show only position, overbooking hatches sit below project allocation identity, and the Allocation editor starts directly with the Project control.
+
 ## Decision Log
 
 ### Frontend-only first slice
@@ -188,6 +211,79 @@ Rejected options:
 - Expand every person by default. Rejected because it made the Allocation dense before the user asked for project detail.
 - Use tinted allocation interiors. Rejected because they competed with grid lines and made text less readable.
 
+### Timed Allocation segments
+
+Decision: Store Allocation records as 15-minute snapped timed segments with `startMinute` and `endMinute`, deriving duration from the range instead of storing daily hour totals.
+
+Rationale: The original allocation request only needed daily totals, but producer planning feedback added day-level time placement, multiple same-day project segments, move/resize editing, and current-time awareness. Timed segments preserve the existing compact week/month/year summaries while making the Day view a real timeline editor.
+
+Rejected options:
+
+- Keep hour-only daily records. Rejected because it could not represent multiple blocks, drag placement, or partial-day past striping.
+- Make Time Off define capacity immediately. Rejected because time off rules are still undefined; capacity stays fixed at 8 hours per person/day for this demo.
+- Disallow overlaps. Rejected because the prototype needs to expose overbooking rather than silently prevent it.
+
+### Goals and Time Off routes
+
+Decision: Add Milestones plus Time Off as internal-only routes for Admin, Manager, and Artist users.
+
+Rationale: The requested prototype scope expanded beyond Tasks, Projects, and Allocation. Time Off now validates leave/time off marking and approval without making time off reduce Allocation capacity.
+
+Rejected options:
+
+- Build full Time Off capacity behavior now. Rejected until producer feedback defines real capacity, leave, and time off constraints.
+- Expose placeholders to Clients. Rejected because both views are internal planning surfaces.
+
+### Shared allocation and time off calendar structure
+
+Decision: Allocation and Time Off share the same date toolbar, compact row structure, day timeline conventions, past-time layer, time off overlay source, and project/allocation source data.
+
+Rationale: Producers need consistent date navigation and temporal context across planning and leave review. Allocation remains project/utilization-first. Time Off remains leave-first and shows project allocation only as quiet context.
+
+### Calendar refinement
+
+Decision: Compact project rows render one timed allocation segment per record, positioned by its minute range within the day and labelled with only that segment duration. Person/project label width is derived from visible person names and project names, including folded project rows, then clamped so the calendar fits the available timeline field without bottom horizontal scrolling.
+
+Decision: Calendar hatch patterns share one timeline-level stripe geometry and viewport-anchored phase across past-time, Time Off, and overbooking layers. Overbooking remains red and below allocation identity; holiday remains blue; sick leave remains green.
+
+Decision: Day view uses persisted Settings padding with defaults of 2 past hours and 10 upcoming hours. Today's Day view shows `now - past padding` through `now + upcoming padding`, clamped to the day. Non-today Day view uses the same span from a stable 09:00 start, defaulting to 09:00-21:00.
+
+Rationale: Producers need compact rows to communicate when same-day work happens without repeating project names in every cell. The focused Day window keeps current work editable without forcing a full 24-hour horizontal timeline, while settings preserve studio-specific planning preferences.
+
+### Time Off approval and visual contract
+
+Decision: Time Off records carry `type` (`holiday` or `sick-leave`) and `status` (`pending` or `confirmed`). New time off from every role default to pending. Admins and Managers can confirm selected pending time off or revert selected confirmed time off.
+
+Rationale: Approval state is part of the time off workflow, but creation and approval should be explicit and consistent. Capacity impact remains intentionally deferred.
+
+Final marking contract:
+
+- Compact time off stripes are full-cell overlays in both Time Off and Allocation.
+- Day time off stripes are timed-range overlays that fill the full row height across the booked range.
+- Pending and confirmed time off use the same stripe geometry; pending uses translucent stripe bands, and confirmation strengthens those bands to full colour.
+- Time Off stripes sit above past-time hatching and above selection/hover washes.
+- Selected cells use a flat accent wash; hover uses a stronger flat accent wash and never uses hatching.
+- Allocation and Time Off use the same past-time rules: compact past dates hatch the whole cell, while Day view hatches only elapsed time on the current day.
+- Overlapping holiday/sick-leave time off for the same person, date, and time range are disallowed; adjacent non-overlapping ranges on the same date can coexist.
+
+### Allocation capacity remains fixed
+
+Decision: Time Off are visual-only in this slice and do not reduce allocation capacity. Allocation utilization and overbooking remain calculated against fixed 8-hour person/day capacity.
+
+Rationale: Leave policy, working calendars, partial capacity, and conflict rules are not final. Keeping capacity fixed makes the prototype deterministic while still exposing time off in both views.
+
+### Allocation planning and actualization permissions
+
+Decision: Admins and Managers can edit all allocation plans. Artists can edit only their own allocation segments/statuses so a future actualization flow can let them review and update their work after manager planning.
+
+Rationale: The prototype needs to distinguish manager planning authority from artist self-reporting without introducing backend authorization in this slice.
+
+### App-level planning timezone
+
+Decision: Add a Settings timezone value persisted to localStorage and use it for Day view current-time marker and past-time striping.
+
+Rationale: Planning views need one consistent app timezone rather than relying only on the browser clock. The default remains the browser timezone for low-friction demos.
+
 ### Relay checkbox styling
 
 Decision: Render task, subtask, permission, and attachment checkboxes as custom square line controls with filled checked states.
@@ -237,6 +333,7 @@ Rejected options:
 - How DCC-originated tasks should be identified and reconciled.
 - How frontend prototype permissions map to eventual backend authorization policies.
 - Whether Allocations should become hourly records or remain daily records with hour totals.
+- How Time Off should eventually define real working capacity, leave, holds, and conflicts.
 - Whether project creation should require more metadata than `name` and `code`.
 - Whether task review versions should become first-class records separate from tasks.
 - How multi-pane task review should behave on narrow screens beyond the current prototype behavior.

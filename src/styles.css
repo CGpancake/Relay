@@ -1,3 +1,4 @@
+/* Frozen: no new component styles. New components use *.module.css alongside their .tsx file. */
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&display=swap");
 
 :root {
@@ -84,13 +85,22 @@ button {
   border-right: var(--border-width) solid var(--line-s);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
   grid-column: 1;
   grid-row: 2;
-  min-height: calc(100vh - 48px);
-  padding: var(--space-4) 0;
-  position: relative;
+  height: calc(100vh - 48px);
+  position: sticky;
+  top: 48px;
   transition: width 160ms ease;
+}
+
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-5);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4) 0;
 }
 
 .wordmark {
@@ -180,13 +190,11 @@ button {
   top: 50%;
   transform: translateY(-50%);
   width: 28px;
-  z-index: 12;
+  z-index: 60;
 }
 
-.is-sidebar-collapsed .sidebar {
-  cursor: pointer;
+.is-sidebar-collapsed .sidebar-inner {
   gap: var(--space-4);
-  overflow: hidden;
 }
 
 .is-sidebar-collapsed .wordmark,
@@ -211,6 +219,7 @@ button {
 
 .is-sidebar-collapsed .sidebar-collapse {
   display: flex;
+  right: -14px;
 }
 
 .sidebar h2,
@@ -289,8 +298,28 @@ button {
 .content {
   grid-column: 2;
   grid-row: 2;
+  height: calc(100vh - 48px);
   min-width: 0;
+  overflow-y: auto;
   padding: var(--space-6);
+}
+
+.error-boundary-fallback {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6);
+}
+
+.error-boundary-fallback strong {
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.error-boundary-fallback span {
+  color: var(--ink-2);
+  font-size: 11px;
 }
 
 .view-header {
@@ -301,6 +330,10 @@ button {
   justify-content: space-between;
   margin-bottom: var(--space-4);
   padding-bottom: var(--space-4);
+}
+
+.calendar-header .calendar-mode-buttons {
+  justify-content: flex-end;
 }
 
 .eyebrow {
@@ -423,22 +456,49 @@ h1 {
 .toolbar button,
 .toggle-row button {
   background: transparent;
+  box-sizing: border-box;
   cursor: pointer;
+  min-height: 32px;
+  white-space: nowrap;
 }
 
 .calendar-toolbar {
   display: grid;
+  gap: var(--space-2);
   grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
 }
 
-.calendar-toolbar button,
-.calendar-toolbar input {
+.calendar-toolbar > button {
+  min-height: 32px;
   width: 100%;
 }
 
-.calendar-toolbar input {
+.calendar-nav-row {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
   grid-column: 1 / -1;
+}
+
+.calendar-nav-row button {
+  align-items: center;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 32px;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  min-height: unset;
+  padding: 0;
+  width: 32px;
+}
+
+.calendar-nav-row input {
+  box-sizing: border-box;
+  flex: 1;
+  height: 32px;
+  min-height: 32px;
 }
 
 .toolbar button.is-active,
@@ -656,9 +716,30 @@ textarea:disabled {
 }
 
 .task-row:hover,
-.calendar-cell:hover,
 .people-row:hover {
   background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.calendar-overlay-settings {
+  border: var(--border-width) solid var(--line);
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+}
+
+.calendar-overlay-settings legend {
+  color: var(--ink-3);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.calendar-overlay-settings label {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
 }
 
 .task-row.is-selected,
@@ -667,18 +748,44 @@ textarea:disabled {
 }
 
 .calendar-cell.is-selected {
-  background: color-mix(in srgb, var(--color-active) 10%, transparent);
+  background: var(--bg);
 }
 
-.calendar-date.is-past,
-.calendar-cell.is-past {
-  background-image: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ink) 5%, transparent) 0,
-    color-mix(in srgb, var(--ink) 5%, transparent) 1px,
-    transparent 1px,
-    transparent 8px
-  );
+.calendar-cell.is-selected::before {
+  background: color-mix(in srgb, var(--color-active) 16%, transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  background-attachment: fixed;
+}
+
+.calendar-cell:hover {
+  background: var(--bg);
+}
+
+.calendar-cell:hover::before {
+  background: color-mix(in srgb, var(--color-active) 24%, transparent);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  background-attachment: fixed;
+}
+
+.calendar-cell.is-selected > * {
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-cell.is-selected .allocation-band {
+  z-index: 2;
+}
+
+.calendar-cell.is-selected > .booking-overlay {
+  z-index: 6;
 }
 
 .status-mark-todo {
@@ -1025,6 +1132,7 @@ textarea:disabled {
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: auto auto;
 }
 
 .calendar-toolbar,
@@ -1033,11 +1141,13 @@ textarea:disabled {
 }
 
 .calendar-toolbar {
+  align-self: start;
   grid-column: 2;
   grid-row: 1;
 }
 
 .calendar-timeline {
+  align-self: start;
   grid-row: 1 / span 2;
 }
 
@@ -1088,13 +1198,72 @@ textarea:disabled {
 
 .calendar-timeline {
   border: var(--border-width) solid var(--line-s);
-  overflow: auto;
+  --hatch-angle: -45deg;
+  --hatch-band: 6px;
+  --hatch-size: calc(var(--hatch-band) * 2);
+  --hatch-line: color-mix(in srgb, var(--ink) 9%, transparent);
+  --booking-holiday-color: #3f8cff;
+  --booking-sick-leave-color: #22c55e;
+  --booking-overbook-color: #ef4444;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.calendar-mode-bar {
+  display: none;
+}
+
+.calendar-mode-buttons,
+.overlay-toggle-row {
+  justify-content: start;
+}
+
+.calendar-mode-buttons button {
+  min-width: 86px;
+}
+
+.overlay-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.overlay-toggle-row label {
+  align-items: center;
+  color: var(--ink-2);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 800;
+  gap: var(--space-1);
+  text-transform: uppercase;
+}
+
+.overlay-toggle-row label.is-forced {
+  color: var(--ink);
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: 220px repeat(var(--calendar-columns), minmax(112px, 1fr));
-  min-width: max-content;
+  grid-template-columns: minmax(150px, var(--calendar-label-width, 220px)) repeat(var(--calendar-columns), minmax(0, 1fr));
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.calendar-grid::before,
+.day-timeline::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      var(--hatch-line) 0 var(--hatch-band),
+      transparent var(--hatch-band) var(--hatch-size)
+    );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  background-attachment: fixed;
 }
 
 .calendar-corner,
@@ -1109,22 +1278,26 @@ textarea:disabled {
 
 .calendar-corner,
 .calendar-date {
+  background: var(--bg);
   border-bottom-color: var(--line-s);
   color: var(--ink-3);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
   padding: var(--space-2);
+  position: relative;
   text-transform: uppercase;
+  z-index: 1;
 }
 
 .calendar-person {
+  background: var(--bg);
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
   position: sticky;
   left: 0;
-  z-index: 2;
+  z-index: 3;
 }
 
 .calendar-summary-person {
@@ -1138,6 +1311,10 @@ textarea:disabled {
 .calendar-summary-person span,
 .calendar-project-person {
   min-width: 0;
+}
+
+.calendar-summary-person > span:only-child {
+  grid-column: 1 / -1;
 }
 
 .calendar-summary-person small {
@@ -1195,34 +1372,80 @@ textarea:disabled {
 
 .calendar-cell {
   align-content: start;
-  background: transparent;
+  background: var(--bg);
   cursor: pointer;
   display: grid;
   gap: var(--space-1);
+  overflow: hidden;
   padding: var(--space-2);
+  position: relative;
+  z-index: 1;
   text-align: left;
+}
+
+.calendar-person-controls {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+}
+
+.project-row-picker {
+  grid-column: 1 / -1;
+  min-height: 28px;
+  position: relative;
+  z-index: 20;
+}
+
+.calendar-summary-person:has(.project-row-picker) {
+  overflow: visible;
+  z-index: 30;
 }
 
 .calendar-summary-cell {
   align-items: center;
   border-top: 0;
-  gap: var(--space-2);
-  grid-template-columns: 7px 1fr;
+  gap: 0;
+  grid-template-columns: 1fr;
   min-height: 50px;
 }
 
 .calendar-project-cell {
-  background: transparent;
-  overflow: hidden;
-  position: relative;
+  background: var(--bg);
   min-height: 42px;
+  overflow: hidden;
+  padding: 0;
 }
 
 .calendar-cell.is-over {
-  border-left: var(--border-accent) solid var(--color-danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--booking-overbook-color) 68%, transparent);
 }
 
-.summary-hours,
+.calendar-cell.is-over::after,
+.day-row.is-over::after {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-overbook-color) 94%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  background-attachment: fixed;
+}
+
+.calendar-cell.is-over.is-past::after,
+.day-row.is-over:has(.past-day-fill)::after {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-overbook-color) 94%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+}
+
 .calendar-cell > span:first-child {
   color: var(--ink-2);
   font-size: 10px;
@@ -1233,16 +1456,26 @@ textarea:disabled {
   align-self: stretch;
   background: color-mix(in srgb, var(--line) 35%, transparent);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 28px;
   overflow: hidden;
-  width: 7px;
+  position: relative;
+  z-index: 2;
+  width: 100%;
 }
 
 .utilization-segment {
   background: color-mix(in srgb, var(--project-color) 72%, transparent);
   flex: 0 0 var(--segment-share);
+  height: 100%;
   min-height: 2px;
+}
+
+.allocation-segment-layer {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
 }
 
 .allocation-band {
@@ -1257,20 +1490,20 @@ textarea:disabled {
   gap: var(--space-1);
   height: 26px;
   justify-content: space-between;
-  left: var(--space-2);
-  padding: 5px var(--space-2) 0;
+  min-width: 24px;
+  overflow: hidden;
+  padding: 2px var(--space-1);
   position: absolute;
-  right: var(--space-2);
   top: 50%;
   transform: translateY(-50%);
+  z-index: 3;
 }
 
-.calendar-project-cell.connects-left .allocation-band {
-  left: -1px;
-}
-
-.calendar-project-cell.connects-right .allocation-band {
-  right: -1px;
+.allocation-band strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .allocation-editor {
@@ -1279,12 +1512,514 @@ textarea:disabled {
   gap: var(--space-3);
 }
 
+.segment-editor-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.segment-editor-row {
+  border: var(--border-width) solid color-mix(in srgb, var(--line) 46%, transparent);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.time-input-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr 1fr;
+}
+
+.segment-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.day-timeline {
+  display: grid;
+  grid-template-columns: minmax(150px, var(--calendar-label-width, 220px)) minmax(0, 1fr);
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.day-label,
+.day-scale,
+.day-person,
+.day-row {
+  border-bottom: var(--border-width) solid var(--line);
+  border-right: var(--border-width) solid var(--line);
+}
+
+.day-label,
+.day-scale {
+  background: var(--bg);
+  border-bottom-color: var(--line-s);
+  color: var(--ink-3);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  min-height: 60px;
+  padding: var(--space-2);
+  position: relative;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.day-scale {
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--line) 42%, transparent) 0 1px, transparent 1px calc(100% / var(--visible-hours, 24))),
+    var(--bg);
+  color: var(--ink-3);
+  position: relative;
+}
+
+.day-scale span {
+  font-size: 9px;
+  font-weight: 700;
+  position: absolute;
+  top: var(--space-2);
+  transform: translateX(-50%);
+}
+
+.day-person {
+  min-height: 50px;
+}
+
+.day-row {
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--line) 34%, transparent) 0 1px, transparent 1px calc(100% / var(--visible-hours, 24))),
+    var(--bg);
+  cursor: crosshair;
+  min-height: 50px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  text-align: left;
+  z-index: 1;
+}
+
+.calendar-project-day-row {
+  min-height: 42px;
+}
+
+.past-day-fill {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      var(--hatch-line) 0 var(--hatch-band),
+      transparent var(--hatch-band) var(--hatch-size)
+    );
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 1;
+  background-attachment: fixed;
+}
+
+.calendar-date.is-past,
+.calendar-cell.is-past {
+  background: transparent;
+}
+
+.booking-overlay {
+  background: transparent;
+  border: 0;
+  display: block;
+  height: 100%;
+  left: 0;
+  min-height: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  right: auto;
+  top: 0;
+  width: 100%;
+  z-index: 6;
+}
+
+button.booking-overlay,
+.booking-overlay.is-selectable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.booking-overlay::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 72%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  content: "";
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  background-attachment: fixed;
+}
+
+.booking-overlay.booking-holiday {
+  --booking-color: var(--booking-holiday-color);
+}
+
+.booking-overlay.booking-sick-leave {
+  --booking-color: var(--booking-sick-leave-color);
+}
+
+.booking-overlay.is-past-booking::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 72%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+}
+
+.booking-overlay.is-future-booking::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 72%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+}
+
+.booking-overlay.is-compact {
+  bottom: 0;
+  height: 100%;
+  inset: 0;
+  left: 0;
+  min-height: inherit;
+  overflow: hidden;
+  right: 0;
+  top: 0;
+  width: 100%;
+}
+
+.booking-overlay.is-compact::before {
+  inset: 0;
+  width: 100%;
+}
+
+.booking-overlay.status-pending::before,
+.booking-overlay.is-compact.status-pending::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 42%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  opacity: 0.62;
+}
+
+.booking-overlay.status-confirmed::before,
+.booking-overlay.is-compact.status-confirmed::before {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 92%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  opacity: 1;
+}
+
+.booking-overlay.is-compact.is-past-booking::before {
+  opacity: 1;
+}
+
+.booking-overlay.is-compact.status-pending.is-past-booking::before {
+  opacity: 0.48;
+}
+
+.current-time-marker {
+  background: var(--color-danger);
+  bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 2px;
+  z-index: 3;
+}
+
+.allocation-block {
+  background: color-mix(in srgb, var(--project-color) 82%, var(--bg));
+  border: var(--border-width) solid color-mix(in srgb, var(--project-color) 76%, var(--ink));
+  color: var(--ink);
+  cursor: grab;
+  min-height: 34px;
+  min-width: 26px;
+  overflow: visible;
+  position: absolute;
+  top: 12px;
+  z-index: 2;
+}
+
+.allocation-block.is-draft {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-active) 35%, transparent);
+  border-color: var(--color-active);
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  padding: var(--space-1);
+}
+
+.allocation-block.is-selected {
+  box-shadow: 0 0 0 2px var(--color-active);
+  z-index: 4;
+}
+
+.allocation-block > button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  height: 100%;
+  min-width: 0;
+  padding: var(--space-1);
+  text-align: left;
+  width: 100%;
+}
+
+.allocation-block strong,
+.allocation-block small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.allocation-block strong {
+  font-size: 10px;
+}
+
+.allocation-block small {
+  color: var(--ink-2);
+  font-size: 9px;
+}
+
+.resize-handle {
+  bottom: 0;
+  cursor: ew-resize;
+  position: absolute;
+  top: 0;
+  width: 4px;
+  z-index: 5;
+}
+
+.resize-handle.is-start {
+  left: -2px;
+}
+
+.resize-handle.is-end {
+  right: -2px;
+}
+
+.allocation-context {
+  background: var(--bg);
+  border: var(--border-width) solid var(--line-s);
+  box-shadow: 0 10px 24px color-mix(in srgb, #000 24%, transparent);
+  display: grid;
+  gap: var(--space-1);
+  left: 0;
+  min-width: 120px;
+  padding: var(--space-1);
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 10;
+}
+
+.allocation-context button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  text-align: left;
+}
+
 .allocation-editor p,
 .access-note,
 .allocation-editor small {
   color: var(--ink-3);
   font-size: 10px;
   margin: 0;
+}
+
+.bookings-layout {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+}
+
+.booking-editor,
+.booking-list,
+.booking-day {
+  background: var(--bg);
+  border: var(--border-width) solid var(--line-s);
+}
+
+.booking-editor,
+.booking-list {
+  align-content: start;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.booking-day {
+  display: grid;
+  grid-template-rows: 38px 96px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.booking-day-scale,
+.booking-day-row {
+  min-width: 960px;
+  position: relative;
+}
+
+.booking-day-scale {
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--line) 75%, transparent) 0 1px, transparent 1px calc(100% / 24));
+  border-bottom: var(--border-width) solid var(--line);
+  color: var(--ink-3);
+}
+
+.booking-day-scale span {
+  font-size: 9px;
+  font-weight: 700;
+  position: absolute;
+  top: var(--space-2);
+  transform: translateX(-50%);
+}
+
+.booking-day-row {
+  background:
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--line) 75%, transparent) 0 1px, transparent 1px calc(100% / 24)),
+    repeating-linear-gradient(to right, color-mix(in srgb, var(--line) 32%, transparent) 0 1px, transparent 1px calc(100% / 96));
+}
+
+.booking-block {
+  background-color: transparent;
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 92%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  border: var(--border-width) solid color-mix(in srgb, var(--booking-color) 72%, var(--ink));
+  color: var(--ink);
+  display: grid;
+  gap: 1px;
+  min-height: 56px;
+  min-width: 46px;
+  padding: var(--space-2);
+  position: absolute;
+  top: 20px;
+  z-index: 6;
+}
+
+.booking-block > button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  height: 100%;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.booking-block.is-selected {
+  box-shadow: 0 0 0 2px var(--color-active);
+  z-index: 8;
+}
+
+.booking-block.booking-holiday {
+  --booking-color: #3f8cff;
+}
+
+.booking-block.booking-sick-leave {
+  --booking-color: #22c55e;
+}
+
+.booking-block.status-pending {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 42%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  opacity: 1;
+}
+
+.booking-block.status-confirmed {
+  background-image:
+    repeating-linear-gradient(
+      var(--hatch-angle),
+      transparent 0 var(--hatch-band),
+      color-mix(in srgb, var(--booking-color) 92%, transparent) var(--hatch-band) var(--hatch-size)
+    );
+  opacity: 1;
+}
+
+.booking-allocation-context {
+  background: color-mix(in srgb, var(--project-color) 35%, transparent);
+  border-top: 3px solid var(--project-color);
+  bottom: 8px;
+  height: 12px;
+  pointer-events: none;
+  position: absolute;
+  z-index: 4;
+}
+
+.booking-allocation-summary {
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  border-top: 2px solid color-mix(in srgb, var(--ink) 36%, transparent);
+  bottom: 6px;
+  height: 8px;
+  left: var(--space-2);
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.booking-block strong,
+.booking-block span,
+.booking-block small,
+.booking-list p {
+  font-size: 10px;
+  margin: 0;
+}
+
+.booking-block strong {
+  text-transform: uppercase;
+}
+
+.booking-block small,
+.booking-list p {
+  color: var(--ink-3);
+}
+
+.booking-list article {
+  border: var(--border-width) solid color-mix(in srgb, var(--line) 46%, transparent);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
 }
 
 .is-muted {
@@ -2084,6 +2819,7 @@ textarea:disabled {
 
 @media (max-width: 1100px) {
   .calendar-layout,
+  .bookings-layout,
   .projects-layout,
   .people-layout,
   .documentation-layout,

@@ -2,7 +2,27 @@
 
 ## Allocation
 
-A planned block of time for a person on a project and date. Allocations can include hours, status, notes, and attached task due-date updates.
+A planned timed segment for a person on a project and date. Allocations store start and end minutes, then derive duration.
+
+## Time Off
+
+The internal leave calendar for holiday and sick leave. Time Off carry pending or confirmed approval state, but they do not drive Allocation capacity yet. Overlapping time off for the same person/date/time range are blocked.
+
+## Time Off approval
+
+The pending or confirmed state on a time off. New time off always start pending. Managers and Admins can confirm selected pending time off or revert selected confirmed time off.
+
+## Time Off stripe
+
+The leave mark shown in Time Off and Allocation. Compact time off stripes fill the whole cell. Day time off stripes fill the full row height across the booked time range. Pending and confirmed use the same stripe geometry; confirmation strengthens the stripe colour.
+
+## Capacity
+
+The demo limit used for Allocation utilization and overbooking. It is fixed at 8 hours per person/day.
+
+## Milestones
+
+An internal placeholder for future goal and milestone planning.
 
 ## Archive
 

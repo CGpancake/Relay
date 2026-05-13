@@ -4,7 +4,7 @@ export const statuses: TaskStatus[] = ['todo', 'wip', 'review', 'blocked', 'done
 export const phases: TaskPhase[] = ['brief', 'layout', 'animation', 'lighting', 'delivery'];
 export const priorities: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 export const permissionLevels: PermissionLevel[] = ['Admin', 'Manager', 'Artist', 'Client'];
-export const viewIds: ViewId[] = ['projects', 'allocation', 'tasks', 'bidding', 'archive', 'documentation', 'people', 'settings'];
+export const viewIds: ViewId[] = ['projects', 'calendar', 'tasks', 'bidding', 'archive', 'documentation', 'people', 'settings'];
 export const allocationStatuses: AllocationStatus[] = ['planned', 'queued', 'active', 'blocked', 'done'];
 export const projectTags: ProjectTag[] = ['print', 'cg', 'ai', 'retouch'];
 export const projectTools: ProjectTool[] = ['Houdini', 'Comfy', 'Nanobanana', 'Blender', 'Unreal', 'Photoshop'];
@@ -42,7 +42,7 @@ export const allocationStatusLabels: Record<AllocationStatus, string> = {
 
 export const viewLabels: Record<ViewId, string> = {
   projects: 'Projects',
-  allocation: 'Allocation',
+  calendar: 'Calendar',
   tasks: 'Tasks',
   bidding: 'Bidding',
   archive: 'Archive',

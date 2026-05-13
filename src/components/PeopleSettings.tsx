@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { permissionLevels, viewIds, viewLabels } from '../data/labels';
 import { canAdminPeople, permissionsForPermissionLevel } from '../lib/permissions';
 import { themeAccentChoices, themes, themeVariantForMode } from '../themes';
-import type { PermissionLevel, Person } from '../types';
+import type { CalendarDayWindowSettings, CalendarMode, CalendarOverlaySettings, PermissionLevel, Person } from '../types';
 import type { ThemeAccentKey } from '../themes';
 
 export function PeopleView({
@@ -179,22 +179,34 @@ export function PeopleView({
 
 export function SettingsView({
   accentKey,
+  calendarDayWindow,
+  calendarOverlays,
   currentPersonId,
   currentUser,
   people,
   setAccentKey,
+  setCalendarDayWindow,
+  setCalendarOverlays,
   setCurrentPersonId,
   setThemeId,
+  setTimezone,
   themeId,
+  timezone,
 }: {
   accentKey: ThemeAccentKey;
+  calendarDayWindow: CalendarDayWindowSettings;
+  calendarOverlays: CalendarOverlaySettings;
   currentPersonId: string;
   currentUser: Person;
   people: Person[];
   setAccentKey: (accentKey: string) => void;
+  setCalendarDayWindow: (settings: CalendarDayWindowSettings) => void;
+  setCalendarOverlays: (overlays: CalendarOverlaySettings) => void;
   setCurrentPersonId: (personId: string) => void;
   setThemeId: (themeId: string) => void;
+  setTimezone: (timezone: string) => void;
   themeId: string;
+  timezone: string;
 }) {
   const lightTheme = themeVariantForMode(themeId, 'light');
   const darkTheme = themeVariantForMode(themeId, 'dark');
@@ -281,7 +293,70 @@ export function SettingsView({
             </select>
           </label>
         </section>
+        <section>
+          <h2>time planning</h2>
+          <label>
+            Timezone
+            <input
+              aria-label="Timezone"
+              list="timezone-options"
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+            />
+          </label>
+          <datalist id="timezone-options">
+            {['Europe/London', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Australia/Sydney', 'UTC'].map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
+          <div className="time-input-grid">
+            <label>
+              Day past padding
+              <input
+                aria-label="Day past padding"
+                min="0"
+                max="24"
+                onChange={(event) => setCalendarDayWindow({ ...calendarDayWindow, pastHours: Number(event.target.value) })}
+                step="0.25"
+                type="number"
+                value={calendarDayWindow.pastHours}
+              />
+            </label>
+            <label>
+              Day upcoming padding
+              <input
+                aria-label="Day upcoming padding"
+                min="1"
+                max="24"
+                onChange={(event) => setCalendarDayWindow({ ...calendarDayWindow, upcomingHours: Number(event.target.value) })}
+                step="0.25"
+                type="number"
+                value={calendarDayWindow.upcomingHours}
+              />
+            </label>
+          </div>
+          <fieldset className="calendar-overlay-settings">
+            <legend>Calendar overlays</legend>
+            {(['allocation', 'time-off', 'milestones'] as CalendarMode[]).map((mode) => (
+              <label key={mode}>
+                <input
+                  checked={calendarOverlays[mode]}
+                  disabled={mode === 'milestones'}
+                  onChange={(event) => setCalendarOverlays({ ...calendarOverlays, [mode]: event.target.checked, milestones: false })}
+                  type="checkbox"
+                />
+                {calendarModeLabel(mode)}
+              </label>
+            ))}
+          </fieldset>
+        </section>
       </section>
     </>
   );
+}
+
+function calendarModeLabel(mode: CalendarMode) {
+  if (mode === 'time-off') return 'Time Off';
+  if (mode === 'milestones') return 'Milestones';
+  return 'Allocation';
 }

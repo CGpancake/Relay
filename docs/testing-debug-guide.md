@@ -8,9 +8,9 @@ Check that:
 
 - The app can run locally as a Vite React TypeScript project.
 - `/tasks` loads as the primary task workflow screen.
-- `/projects`, `/allocation`, `/people`, and `/settings` routes load for users with access.
+- `/projects`, `/calendar?mode=allocation`, `/people`, and `/settings` routes load for users with access.
 - `/archive` loads for users with access.
-- Primary navigation order is Projects, Allocation, Tasks, Archive, People, Settings.
+- Primary navigation order is Projects, Calendar, Tasks, Bidding, Archive, Documentation, People, Settings.
 - The top header keeps `RELAY` on the left and the notification bell on the right without overlapping view headers.
 - The side navigation collapses with the middle arrow and expands when clicking `RELAY` or the narrow rail.
 - Seed data is the same after each page load.
@@ -54,6 +54,18 @@ Check that:
 - Allocation cells visually mark days over 8 allocated hours.
 - Allocation headers and cells hatch dates before the browser's local today, but not today or future dates.
 - Allocation day/week/month/year/date controls sit above the selected-cells editor and align to that editor width.
+- Time Off uses the same date toolbar and past-time conventions as Allocation.
+- Time Off types are Holiday and Sick leave.
+- New time off from every role start pending.
+- Pending time off stripes use the same geometry as confirmed stripes, but with translucent stripe bands; confirming strengthens the same stripe pattern to full colour.
+- Admins and Managers can confirm selected pending time off and revert selected confirmed time off.
+- Compact time off stripes cover the full cell; Day time off stripes cover the full row height across the booked time range.
+- Overlapping holiday/sick-leave time off for the same person/date/time range are blocked with inline validation; adjacent non-overlapping ranges are allowed.
+- Selected calendar cells use a flat accent wash and hovered cells use a stronger flat accent wash; neither wash uses hatching, and time off/allocation context remains visible above both.
+- Time Off overlays appear in Allocation without reducing the fixed 8-hour allocation capacity.
+- Calendar overlay defaults are controlled from Settings, persist across reloads, and the active mode overlay remains visible even when its saved default is off.
+- Artists can edit only their own allocation segments/statuses; Managers/Admins can edit all allocation plans.
+- Project add dropdown menus render above calendar rows without clipping.
 - Archive filters by deliverable/project tag, tool, task status, and task phase.
 - Archive aggregate numbers update after archive and restore actions.
 
@@ -92,6 +104,12 @@ Check that:
 31. Apply an allocation to mixed summary/project selections and confirm project rows keep their own project while summary rows use the picker.
 32. Confirm past dates before local today show hatching and today/future dates do not.
 33. Confirm the allocation time controls align with the selected-cells editor in the right column.
+34. Open Time Off as any internal user, create a time off, and confirm it is pending.
+35. Open Time Off as a Manager or Admin, click a compact booked cell, and confirm the selected time off can be approved without switching to Day view.
+36. Select a confirmed time off and confirm only the revert action is shown; select a pending time off and confirm only the confirm action is shown.
+37. Create an overlapping time off for the same person/date/time range and confirm inline validation blocks the second time off.
+38. Create adjacent non-overlapping ranges for the same person/date and confirm both can coexist.
+39. Create a time off, return to Allocation, and confirm utilization still uses fixed 8-hour capacity.
 
 ## Common Failure Modes
 
@@ -253,6 +271,12 @@ Debug approach:
 - Exact allocation project-row selection identity.
 - Mixed summary/project allocation editing.
 - Past-date hatching and Allocation control/editor alignment.
+- Time Off pending/confirmed approval and visual styles.
+- Time Off compact full-cell overlays, Day timed full-height overlays, compact-cell time off selection, and overlap validation.
+- Selection and hover wash layering with time off/allocation context above both washes.
+- Time Off overlays shared between Time Off and Allocation.
+- Artist own-allocation editing and denial of editing other users' allocations.
+- Project picker dropdown clipping/stacking regression coverage.
 - Archive filters and aggregate counts.
 
 ## Out Of Scope For This Slice

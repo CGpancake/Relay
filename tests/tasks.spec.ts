@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { themes } from '../src/themes';
 
 test.beforeEach(async ({ page }) => {
@@ -6,6 +6,11 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 });
+
+async function openCalendar(page: Page, mode: 'Allocation' | 'Time Off' | 'Milestones' = 'Allocation') {
+  await page.getByRole('button', { name: /Calendar/ }).click();
+  await page.getByRole('button', { name: mode, exact: true }).click();
+}
 
 test('task groups and seed rows render', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'To do' })).toBeVisible();
@@ -176,7 +181,7 @@ test('creating a project generates internal code and places the selected studio'
   await page.getByRole('button', { name: /Tasks/ }).click();
   await expect(page.getByLabel('Project')).toContainText('Signal Field Tests');
 
-  await page.getByRole('button', { name: /Allocation/ }).click();
+  await openCalendar(page, 'Allocation');
   await expect(page.getByLabel('Project').last()).toContainText('Signal Field Tests');
 });
 
@@ -339,7 +344,7 @@ test('client role cannot access restricted views', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: /Tasks/ })).toBeEnabled();
   await expect(page.getByRole('button', { name: /Documentation/ })).toBeEnabled();
-  await expect(page.getByRole('button', { name: /Allocation/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Calendar/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Bidding/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /People/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Settings/ })).toBeDisabled();
@@ -354,6 +359,245 @@ test('bidding appears in nav and renders placeholder view', async ({ page }) => 
   await page.getByRole('button', { name: /Bidding/ }).click();
   await expect(page).toHaveURL(/\/bidding$/);
   await expect(page.getByRole('heading', { name: 'bidding' })).toBeVisible();
+});
+
+test('primary navigation order exposes one calendar entry', async ({ page }) => {
+  const labels = await page.locator('.sidebar section').first().getByRole('button').evaluateAll((buttons) =>
+    buttons.map((button) => button.querySelector('span')?.textContent?.trim()),
+  );
+
+  expect(labels).toEqual([
+    'Projects',
+    'Calendar',
+    'Tasks',
+    'Bidding',
+    'Archive',
+    'Documentation',
+    'People',
+    'Settings',
+  ]);
+});
+
+test('collapsed sidebar icons switch views without expanding and arrow remains visible', async ({ page }) => {
+  await page.getByRole('button', { name: 'Collapse navigation' }).click();
+  await expect(page.locator('.relay-shell')).toHaveClass(/is-sidebar-collapsed/);
+
+  await page.getByRole('button', { name: 'Calendar', exact: true }).click();
+  await expect(page).toHaveURL(/\/calendar\?mode=allocation$/);
+  await expect(page.locator('.relay-shell')).toHaveClass(/is-sidebar-collapsed/);
+
+  const arrowBox = await page.getByRole('button', { name: 'Expand navigation' }).boundingBox();
+  expect(arrowBox).not.toBeNull();
+  expect(arrowBox!.x).toBeGreaterThanOrEqual(0);
+  expect(arrowBox!.y).toBeGreaterThanOrEqual(0);
+
+  await page.getByRole('button', { name: 'Expand navigation' }).click();
+  await expect(page.locator('.relay-shell')).not.toHaveClass(/is-sidebar-collapsed/);
+});
+
+test('calendar route aliases select the matching mode', async ({ page }) => {
+  await page.goto('/allocation');
+  await expect(page).toHaveURL(/\/calendar\?mode=allocation$/);
+  await expect(page.getByRole('button', { name: 'Allocation', exact: true })).toHaveClass(/is-active/);
+
+  await page.goto('/bookings');
+  await expect(page).toHaveURL(/\/calendar\?mode=time-off$/);
+  await expect(page.getByRole('button', { name: 'Time Off', exact: true })).toHaveClass(/is-active/);
+  await expect(page.getByLabel('Time Off editor')).toBeVisible();
+
+  await page.goto('/goals');
+  await expect(page).toHaveURL(/\/calendar\?mode=milestones$/);
+  await expect(page.getByRole('button', { name: 'Milestones', exact: true })).toHaveClass(/is-active/);
+  await expect(page.getByLabel('Milestones editor')).toBeVisible();
+});
+
+test('time off creates pending holiday and sick leave marks and resets on reload', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByLabel('Time off type').selectOption('holiday');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+
+  await page.getByLabel('Time off type').selectOption('sick-leave');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-06').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05').getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-06').getByTestId(/time-off-overlay-sick-leave-pending/)).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(0);
+});
+
+test('time off creates full-day marks and updates selected entries to hourly ranges', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByLabel('Time off type').selectOption('sick-leave');
+  await page.getByRole('button', { name: 'Hourly' }).click();
+  await page.getByLabel('Time off start time').selectOption(String(10 * 60));
+  await page.getByLabel('Time off end time').selectOption(String(12 * 60));
+  await page.getByRole('button', { name: 'Update time off' }).click();
+
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(0);
+  await expect(page.getByTestId(/time-off-overlay-sick-leave-pending/)).toBeVisible();
+});
+
+test('artist time off starts pending and managers can confirm or revert time off', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('relay:current-person', 'person-artist-a'));
+  await page.reload();
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-artist-a-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+  const pendingStyles = await page.getByTestId(/time-off-overlay-holiday-pending/).evaluate((element) => {
+    const styles = getComputedStyle(element, '::before');
+    return { backgroundImage: styles.backgroundImage, opacity: styles.opacity };
+  });
+  const pendingPattern = pendingStyles.backgroundImage;
+  expect(pendingPattern).toContain('repeating-linear-gradient');
+  expect(pendingPattern).toContain('-45deg');
+  expect(Number(pendingStyles.opacity)).toBeLessThan(1);
+
+  await page.evaluate(() => localStorage.setItem('relay:current-person', 'person-manager'));
+  await page.reload();
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+  await page.getByTestId(/time-off-overlay-holiday-pending/).click();
+  await expect(page.getByTestId('time-off-selection-count')).toHaveText('1 selected');
+  await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Revert to pending' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-confirmed/)).toBeVisible();
+  const confirmedCompactStyles = await page.getByTestId(/time-off-overlay-holiday-confirmed/).evaluate((element) => {
+    const styles = getComputedStyle(element, '::before');
+    const box = element.getBoundingClientRect();
+    const parent = element.parentElement!.getBoundingClientRect();
+    return { backgroundImage: styles.backgroundImage, height: box.height, opacity: styles.opacity, parentHeight: parent.height };
+  });
+  const confirmedCompactPattern = confirmedCompactStyles.backgroundImage;
+  expect(confirmedCompactPattern).toContain('repeating-linear-gradient');
+  expect(confirmedCompactPattern).toContain('-45deg');
+  expect(Number(confirmedCompactStyles.opacity)).toBe(1);
+  expect(confirmedCompactStyles.height).toBeGreaterThan(confirmedCompactStyles.parentHeight * 0.9);
+  expect(confirmedCompactPattern).not.toBe(pendingPattern);
+  await page.getByTestId(/time-off-overlay-holiday-confirmed/).first().click();
+  await page.getByRole('button', { name: 'Revert to pending' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Revert to pending' })).toHaveCount(0);
+  await page.getByTestId(/time-off-overlay-holiday-pending/).first().click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-confirmed/)).toBeVisible();
+});
+
+test('time off blocks overlapping ranges and allows non-overlapping ranges', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByRole('button', { name: 'Hourly' }).click();
+  await page.getByLabel('Time off start time').selectOption(String(9 * 60));
+  await page.getByLabel('Time off end time').selectOption(String(12 * 60));
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+
+  await page.getByLabel('Time off start time').selectOption(String(13 * 60));
+  await page.getByLabel('Time off end time').selectOption(String(14 * 60));
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(2);
+
+  await page.getByTestId(/time-off-overlay-holiday-pending/).nth(1).click();
+  await page.getByLabel('Time off start time').selectOption(String(11 * 60));
+  await page.getByLabel('Time off end time').selectOption(String(13 * 60));
+  await page.getByRole('button', { name: 'Update time off' }).click();
+  await expect(page.getByRole('alert')).toContainText('overlaps an existing time off');
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(2);
+});
+
+test('calendar date arrows move by active view unit', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-13');
+  const navBoxes = await page.locator('.calendar-nav-row').evaluate((row) => {
+    const [previous, input, next] = Array.from(row.children).map((child) => child.getBoundingClientRect());
+    return {
+      centers: [previous, input, next].map((box) => box.top + box.height / 2),
+      heights: [previous.height, input.height, next.height],
+    };
+  });
+  expect(new Set(navBoxes.heights.map((height) => Math.round(height))).size).toBe(1);
+  expect(Math.max(...navBoxes.centers) - Math.min(...navBoxes.centers)).toBeLessThanOrEqual(1);
+  await page.getByRole('button', { name: 'Previous week' }).click();
+  await expect(page.getByLabel('Selected date')).toHaveValue('2026-05-06');
+  await page.getByRole('button', { name: 'day' }).click();
+  await page.getByRole('button', { name: 'Next day' }).click();
+  await expect(page.getByLabel('Selected date')).toHaveValue('2026-05-07');
+
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-13');
+  await page.getByRole('button', { name: 'month' }).click();
+  await page.getByRole('button', { name: 'Next month' }).click();
+  await expect(page.getByLabel('Time off date')).toHaveValue('2026-06-13');
+  await page.getByRole('button', { name: 'year' }).click();
+  await page.getByRole('button', { name: 'Previous year' }).click();
+  await expect(page.getByLabel('Time off date')).toHaveValue('2025-06-13');
+});
+
+test('calendar overlay defaults live in settings and active mode overlay is forced on', async ({ page }) => {
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.locator('.calendar-overlay-settings').getByLabel('Time Off').uncheck();
+  await page.reload();
+  await expect(page.locator('.calendar-overlay-settings').getByLabel('Time Off')).not.toBeChecked();
+
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Allocation', exact: true }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.locator('.calendar-overlay-settings').getByLabel('Time Off').check();
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
+});
+
+test('day view padding settings persist and drive the focused day scale', async ({ page }) => {
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await expect(page.getByLabel('Day past padding')).toHaveValue('2');
+  await expect(page.getByLabel('Day upcoming padding')).toHaveValue('10');
+  await page.getByLabel('Day past padding').fill('1');
+  await page.getByLabel('Day upcoming padding').fill('8');
+  await page.reload();
+  await expect(page.getByLabel('Day past padding')).toHaveValue('1');
+  await expect(page.getByLabel('Day upcoming padding')).toHaveValue('8');
+
+  await openCalendar(page, 'Allocation');
+  await page.getByRole('button', { name: 'day' }).click();
+  await page.getByLabel('Selected date').fill('2026-05-14');
+  await expect(page.locator('.day-scale')).toContainText('09:00');
+  await expect(page.locator('.day-scale')).not.toContainText('22:00');
+});
+
+test('time off visibility follows permission level', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await expect(page.getByTestId('calendar-summary-row-person-manager')).toContainText('Ben Hall');
+  await expect(page.getByTestId('calendar-summary-row-person-artist-a')).toContainText('Tom Amrose');
+
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByLabel('Current user').selectOption('person-artist-a');
+  await openCalendar(page, 'Time Off');
+  await expect(page.getByTestId('calendar-summary-row-person-artist-a')).toContainText('Tom Amrose');
+  await expect(page.getByTestId('calendar-summary-row-person-manager')).toHaveCount(0);
 });
 
 test('documentation view browses bundled markdown and resolves wiki links', async ({ page }) => {
@@ -389,7 +633,8 @@ test('archive project rows use full project names without visible codes', async 
 });
 
 test('calendar starts collapsed and expands person rows on demand', async ({ page }) => {
-  await page.getByRole('button', { name: /Allocation/ }).click();
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
   await expect(page.getByTestId('calendar-timeline')).toBeVisible();
   await expect(page.getByLabel('Team list')).not.toBeVisible();
   await expect(page.getByTestId('calendar-summary-row-person-manager')).toContainText('Ben Hall');
@@ -403,14 +648,34 @@ test('calendar starts collapsed and expands person rows on demand', async ({ pag
   await expect(page.getByTestId('calendar-project-row-person-manager-novartis-novartis')).not.toBeVisible();
 });
 
-test('calendar uses readable summary hours, faint separators, accent lines, and stacked utilization', async ({ page }) => {
-  await page.getByRole('button', { name: /Allocation/ }).click();
+test('allocation add button creates an empty selectable project row', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await page.getByRole('button', { name: 'Add project row for Ben Hall' }).click();
+  await page.getByRole('button', { name: 'Pick project' }).click();
+  await page.getByRole('button', { name: 'Bexsero Retouch Project' }).click();
+
+  await expect(page.getByTestId('calendar-project-row-person-manager-bexsero-retouch-project')).toBeVisible();
+  await page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').click();
+  await expect(page.getByLabel('Project').last()).toHaveValue('bexsero-retouch-project');
+  await page.getByLabel('Start time 1').fill('11:00');
+  await page.getByLabel('End time 1').fill('13:00');
+  await page.getByRole('button', { name: 'Apply allocation' }).click();
+
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06')).toContainText('2h');
+});
+
+test('calendar uses proportional summary fills without numeric hour totals', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
   await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
 
   const novartisBand = page.getByTestId('calendar-project-cell-person-manager-novartis-novartis-2026-05-04').locator('.allocation-band');
   const area23Band = page.getByTestId('calendar-project-cell-person-manager-area23-projectj-toleb-2026-05-05').locator('.allocation-band');
   await expect(novartisBand).toBeVisible();
   await expect(area23Band).toBeVisible();
+  await expect(novartisBand).toContainText('4h');
+  await expect(novartisBand).not.toContainText('Novartis Novartis');
 
   const colors = await Promise.all([
     novartisBand.evaluate((element) => getComputedStyle(element).borderTopColor),
@@ -419,57 +684,208 @@ test('calendar uses readable summary hours, faint separators, accent lines, and 
   expect(colors[0]).not.toBe(colors[1]);
   await expect(novartisBand).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
-  const summaryStyles = await page.getByTestId('calendar-total-person-manager-2026-05-04').evaluate((element) => {
-    const styles = getComputedStyle(element);
-    const cellStyles = getComputedStyle(element.closest('.calendar-cell')!);
+  const summaryStyles = await page.getByTestId('calendar-cell-person-manager-2026-05-04').evaluate((element) => {
+    const cellStyles = getComputedStyle(element);
+    const utilization = element.querySelector('.utilization-stack')!;
     return {
-      color: styles.color,
-      fontSize: styles.fontSize,
-      fontWeight: styles.fontWeight,
       borderRight: cellStyles.borderRightColor,
+      text: element.textContent?.trim(),
+      utilizationWidth: getComputedStyle(utilization).width,
     };
   });
-  expect(Number.parseFloat(summaryStyles.fontSize)).toBeGreaterThanOrEqual(10);
-  expect(Number.parseInt(summaryStyles.fontWeight, 10)).toBeGreaterThanOrEqual(700);
+  expect(summaryStyles.text).toBe('');
+  expect(Number.parseFloat(summaryStyles.utilizationWidth)).toBeGreaterThan(20);
+  const timelineOverflow = await page.getByTestId('calendar-timeline').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(timelineOverflow.scrollWidth).toBeLessThanOrEqual(timelineOverflow.clientWidth + 1);
 
   await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
   await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
-  await page.getByLabel('Hours').fill('4');
+  await page.getByLabel('Duration 1').fill('4');
   await page.getByRole('button', { name: 'Apply allocation' }).click();
 
   await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-05').locator('.utilization-segment')).toHaveCount(2);
 });
 
-test('calendar keeps person date selection, adds allocations per project, and attaches tasks', async ({ page }) => {
-  await page.getByRole('button', { name: /Allocation/ }).click();
+test('allocation layers neutral past, red overbooking, and time off overlays without changing totals', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByLabel('Time off type').selectOption('holiday');
+  await page.getByRole('button', { name: 'Hourly' }).click();
+  await page.getByLabel('Time off start time').selectOption('0');
+  await page.getByLabel('Time off end time').selectOption(String(12 * 60));
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await page.getByLabel('Time off type').selectOption('sick-leave');
+  await page.getByLabel('Time off start time').selectOption(String(13 * 60));
+  await page.getByLabel('Time off end time').selectOption(String(14 * 60));
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await page.getByTestId(/time-off-overlay-holiday-pending/).click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await page.getByTestId(/time-off-overlay-sick-leave-pending/).click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).toHaveAttribute('aria-label', /5h allocated/);
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).not.toHaveClass(/is-over/);
+
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByLabel('Duration 1').fill('4');
+  await page.getByRole('button', { name: 'Apply allocation' }).click();
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).toHaveAttribute('aria-label', /9h allocated/);
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).toHaveClass(/is-over/);
+
+  await expect(page.getByTestId('time-off-overlay-holiday-confirmed-person-manager-2026-05-05')).toBeVisible();
+  await expect(page.getByTestId('time-off-overlay-sick-leave-confirmed-person-manager-2026-05-05')).toBeVisible();
+
+  const styles = await page.getByTestId('calendar-cell-person-manager-2026-05-05').evaluate((element) => {
+    const over = getComputedStyle(element, '::after').backgroundImage;
+    const overZ = getComputedStyle(element, '::after').zIndex;
+    const holiday = getComputedStyle(element.querySelector('.booking-holiday')!, '::before').backgroundImage;
+    const sickLeave = getComputedStyle(element.querySelector('.booking-sick-leave')!, '::before').backgroundImage;
+    const selection = getComputedStyle(element, '::before');
+    const utilizationZ = getComputedStyle(element.querySelector('.utilization-stack')!).zIndex;
+    const timeOffZ = getComputedStyle(element.querySelector('.time-off-overlay')!).zIndex;
+    return { holiday, over, overZ, selectionBackground: selection.backgroundColor, selectionPattern: selection.backgroundImage, sickLeave, timeOffZ, utilizationZ };
+  });
+  expect(styles.over).toContain('-45deg');
+  expect(styles.holiday).toContain('repeating-linear-gradient');
+  expect(styles.holiday).toContain('-45deg');
+  expect(styles.sickLeave).toContain('repeating-linear-gradient');
+  expect(styles.sickLeave).toContain('-45deg');
+  expect(styles.selectionPattern).toBe('none');
+  expect(styles.selectionBackground).not.toBe('rgba(0, 0, 0, 0)');
+  expect(Number(styles.utilizationZ)).toBeGreaterThanOrEqual(1);
+  expect(Number(styles.overZ)).toBeLessThan(Number(styles.utilizationZ));
+  expect(Number(styles.timeOffZ)).toBeGreaterThan(Number(styles.utilizationZ));
+
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').hover();
+  const hoverStyles = await page.getByTestId('calendar-cell-person-manager-2026-05-05').evaluate((element) => {
+    const wash = getComputedStyle(element, '::before');
+    const timeOff = getComputedStyle(element.querySelector('.time-off-overlay')!, '::before');
+    return { timeOffImage: timeOff.backgroundImage, washBackground: wash.backgroundColor, washPattern: wash.backgroundImage };
+  });
+  expect(hoverStyles.washPattern).toBe('none');
+  expect(hoverStyles.washBackground).not.toBe(styles.selectionBackground);
+  expect(hoverStyles.timeOffImage).toContain('repeating-linear-gradient');
+
+  const gridStripeBackground = await page.getByTestId('calendar-cell-person-manager-2026-05-04').evaluate((element) => {
+    const grid = element.closest('.calendar-grid')!;
+    return getComputedStyle(grid, '::before').backgroundImage;
+  });
+  expect(gridStripeBackground).toContain('-45deg');
+});
+
+test('calendar keeps person date selection, adds timed segments per project, and attaches tasks', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
   await expect(page.getByTestId('calendar-timeline')).toBeVisible();
   await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
   await page.getByRole('button', { name: 'Expand Tom Amrose' }).click();
 
   await page.getByTestId('calendar-cell-person-manager-2026-05-04').click();
   await page.getByTestId('calendar-cell-person-manager-2026-05-06').click({ modifiers: ['Shift'] });
-  await expect(page.getByTestId('selection-count')).toHaveText('3 selected');
+  await expect(page.getByTestId('selection-count')).toHaveCount(0);
 
   await page.getByTestId('calendar-cell-person-artist-a-2026-05-05').click({ modifiers: ['Control'] });
-  await expect(page.getByTestId('selection-count')).toHaveText('4 selected');
+  await expect(page.getByTestId('selection-count')).toHaveCount(0);
 
   await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
-  await page.getByLabel('Hours').fill('5');
+  await page.getByLabel('Start time 1').fill('09:00');
+  await page.getByLabel('Duration 1').fill('5');
   await page.getByLabel('Status').last().selectOption('active');
   await page.getByRole('textbox', { name: 'Notes' }).fill('bulk allocation smoke test');
   await page.getByLabel('Photoshop retouch working files').check();
   await expect(page.getByTestId('attached-task-count')).toHaveText('1 attached');
   await page.getByRole('button', { name: 'Apply allocation' }).click();
 
-  await expect(page.getByTestId('calendar-total-person-manager-2026-05-04')).toHaveText('9h');
-  await expect(page.getByTestId('calendar-project-cell-person-manager-novartis-novartis-2026-05-04')).toContainText('Novartis Novartis 4h');
-  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-04')).toContainText('Bexsero Retouch Project 5h');
-  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06')).toContainText('Bexsero Retouch Project 5h');
-  await expect(page.getByTestId('calendar-project-cell-person-artist-a-bexsero-retouch-project-2026-05-05')).toContainText('Bexsero Retouch Project 5h');
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-04')).toHaveAttribute('aria-label', /9h allocated/);
+  await expect(page.getByTestId('calendar-project-cell-person-manager-novartis-novartis-2026-05-04')).toContainText('4h');
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-04')).toContainText('5h');
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06')).toContainText('5h');
+  await expect(page.getByTestId('calendar-project-cell-person-artist-a-bexsero-retouch-project-2026-05-05')).toContainText('5h');
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-04')).not.toContainText('Bexsero Retouch Project');
   await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-04')).not.toContainText('BEXRET');
   await expect(page.getByTestId('calendar-cell-person-manager-2026-05-04')).toHaveClass(/is-over/);
   await expect(page.getByTestId('calendar-task-due-task-bexsero-retouch')).toHaveText('2026-05-06');
 
   await page.getByRole('button', { name: /Tasks/ }).click();
   await expect(page.getByTestId('task-row-task-bexsero-retouch')).toContainText('2026-05-06');
+});
+
+test('selected cells can append multiple timed segments to week cells', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-06').click();
+  await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
+  await page.getByLabel('Start time 1').fill('09:00');
+  await page.getByLabel('End time 1').fill('10:30');
+  await page.getByRole('button', { name: 'Add segment' }).click();
+  await page.getByLabel('Start time 2').fill('14:00');
+  await page.getByLabel('End time 2').fill('15:15');
+  await expect(page.getByTestId('selected-time-total')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Apply allocation' }).click();
+  await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').locator('.allocation-band')).toHaveText(['1.5h', '1.25h']);
+  await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-06').locator('.utilization-segment')).toHaveCount(2);
+});
+
+test('selecting an allocated project cell loads all segments and replaces that cell', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
+  await page.getByRole('button', { name: 'Add project row for Ben Hall' }).click();
+  await page.getByRole('button', { name: 'Pick project' }).click();
+  await page.getByRole('button', { name: 'Bexsero Retouch Project' }).click();
+
+  await page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').click();
+  await page.getByLabel('Start time 1').fill('09:00');
+  await page.getByLabel('End time 1').fill('10:30');
+  await page.getByRole('button', { name: 'Add segment' }).click();
+  await page.getByLabel('Start time 2').fill('14:00');
+  await page.getByLabel('End time 2').fill('15:15');
+  await page.getByRole('button', { name: 'Apply allocation' }).click();
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').locator('.allocation-band')).toHaveText(['1.5h', '1.25h']);
+
+  await page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').click();
+  await expect(page.getByTestId('allocation-editor-mode')).toHaveCount(0);
+  await expect(page.getByTestId('segment-editor-row-0')).toBeVisible();
+  await expect(page.getByTestId('segment-editor-row-1')).toBeVisible();
+  await page.getByTestId('segment-editor-row-1').getByRole('button', { name: 'Delete' }).click();
+  await page.getByLabel('Duration 1').fill('1');
+  await page.getByRole('button', { name: 'Replace allocation' }).click();
+
+  await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06')).toContainText('1h');
+  await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-06').locator('.utilization-segment')).toHaveCount(1);
+});
+
+test('day view supports snapped block creation, timezone marker, context delete, and pane sync', async ({ page }) => {
+  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByLabel('Timezone').fill('UTC');
+  await openCalendar(page, 'Allocation');
+  await page.getByRole('button', { name: 'day' }).click();
+  await page.getByLabel('Selected date').fill('2026-05-13');
+  await expect(page.getByTestId('current-time-marker').first()).toBeVisible();
+  await page.getByLabel('Selected date').fill('2026-05-14');
+
+  const row = page.getByTestId('day-row-person-manager-2026-05-14');
+  const box = await row.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + 1, box!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.125, box!.y + 20);
+  await page.mouse.up();
+
+  const block = page.locator('[data-testid^="allocation-block-alloc-local-"]').last();
+  await expect(block).toBeVisible();
+  await expect(page.getByLabel('Start time 1')).toHaveValue('09:00');
+  await expect(page.getByLabel('End time 1')).toHaveValue('10:30');
+
+  await block.click({ button: 'right' });
+  await expect(page.getByTestId('allocation-context-menu')).toBeVisible();
+  await page.getByTestId('allocation-context-menu').getByRole('button', { name: 'Delete' }).click();
+  await expect(block).not.toBeVisible();
 });

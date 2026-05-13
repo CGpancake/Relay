@@ -1,6 +1,6 @@
 # Settings and Themes
 
-Settings contains prototype controls for visual theme and current user.
+Settings contains prototype controls for visual theme, current user, and allocation planning timezone.
 
 ## Theme selection
 
@@ -12,4 +12,8 @@ The Light and Dark buttons switch within the selected theme family when a matchi
 
 ## Persistence
 
-Theme and current prototype user are saved in browser local storage. Task, project, allocation, archive, and notification state still resets on page load.
+Theme, current prototype user, and timezone are saved in browser local storage. Task, project, allocation, archive, and notification state still resets on page load.
+
+## Timezone
+
+The timezone setting defaults to the browser's local timezone. Allocation Day view uses it for the current-time marker and partial past-time striping. Compact Allocation views use it to decide which dates are in the past.

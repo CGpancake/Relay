@@ -16,9 +16,17 @@ The primary route for the task workflow. It contains the task table and task rev
 
 The prototype route for inspecting projects, creating frontend-only projects, and creating project tasks.
 
-## `/allocation`
+## `/calendar?mode=allocation`
 
-The prototype route for producer allocation planning across people, projects, and dates.
+The prototype route for producer allocation planning across people, projects, dates, and timed segments.
+
+## `/calendar?mode=milestones`
+
+The internal-only placeholder route for future Milestones behavior.
+
+## `/calendar?mode=time-off`
+
+The internal-only route for marking holiday and sick leave time off. Time Off are visual-only in this slice and do not reduce allocation capacity.
 
 ## `/archive`
 
@@ -30,7 +38,7 @@ The persistent top row containing `RELAY` on the left and the in-app notificatio
 
 ## Side Navigation
 
-The left view menu for Projects, Allocation, Tasks, Archive, People, and Settings. It can collapse into a narrow icon rail and expand again from the header brand or rail.
+The left view menu for Projects, Calendar, Tasks, Bidding, Archive, Documentation, People, and Settings. It can collapse into a narrow icon rail and expand again from the header brand or rail.
 
 ## Task
 
@@ -106,7 +114,7 @@ A prototype access preset. Current permission levels are Admin, Manager, Artist,
 
 ## Permission
 
-A frontend-only view access flag for Tasks, Allocation, Projects, People, or Settings. These permissions demonstrate product behavior and are not production authorization.
+A frontend-only view access flag for Tasks, Calendar, Projects, People, or Settings. These permissions demonstrate product behavior and are not production authorization.
 
 ## Project
 
@@ -130,11 +138,35 @@ The action that moves an archived record back into active prototype state. Resto
 
 ## Allocation
 
-A local planning record that assigns a person to a project on a date for a number of hours, with status and notes.
+A local planning record that assigns a person to a project on a date with `startMinute`, `endMinute`, status, and notes. Duration is derived from the segment range.
+
+## Timed Allocation Segment
+
+A 15-minute snapped allocation block. Multiple segments for the same person, date, and project are allowed.
+
+## Capacity
+
+The demo capacity used for allocation ratios and overbooking. It is fixed at 8 hours per person/day; time off do not reduce it yet.
+
+## Day View Padding
+
+The persisted Calendar setting that controls the focused Day timeline. Defaults are 2 past hours and 10 upcoming hours; today is now-relative, while non-today dates use the same span from 09:00.
+
+## Time Off
+
+A local leave record for one person and date/time range. Time Off types are `holiday` and `sick-leave`. Overlapping time off for the same person/date/time range are not allowed; adjacent non-overlapping ranges on the same date are allowed.
+
+## Time Off Status
+
+The approval state for a time off. New time off always default to `pending`. Admins and Managers can confirm selected pending time off or revert selected confirmed time off. Time Off always render as stripes with the same geometry: pending uses translucent stripe bands, and confirmed uses full-strength stripe bands.
+
+## Time Off Stripe
+
+The holiday or sick-leave visual mark shown in Time Off and Allocation. Compact time off stripes fill the whole calendar cell. Day time off stripes fill the full row height but only across the booked time range. Time Off stripes share the calendar hatch phase, sit above past-time hatching and selection/hover washes, and keep holiday blue and sick-leave green.
 
 ## Allocation Selection
 
-The current set of selected exact cells in the allocation planner. Selection identity includes person, date, row type, and project id for project rows. Click selects one cell, shift-click selects a contiguous date range for the same exact row identity, and ctrl/meta-click toggles individual cells.
+The current set of selected exact cells or explicit Day blocks in the allocation planner. Selection identity includes person, date, row type, project id for project rows, and allocation id for explicit segments. Click selects one target, shift-click selects a contiguous date range for the same exact row identity, and ctrl/meta-click toggles individual targets.
 
 ## Summary Row
 

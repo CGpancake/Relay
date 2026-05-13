@@ -15,7 +15,7 @@ Human-readable product documentation for the in-app wiki lives in `Documentation
 
 ## Current Slice
 
-Relay is currently a frontend-only prototype built with Vite, React, and TypeScript. The active prototype covers `/projects`, `/allocation`, `/tasks`, `/archive`, `/people`, and `/settings`, with deterministic task, project, people, allocation, archive, and notification state that resets on every page load.
+Relay is currently a frontend-only prototype built with Vite, React, and TypeScript. The active prototype covers `/projects`, `/calendar`, `/tasks`, `/bidding`, `/archive`, `/documentation`, `/people`, and `/settings`, with deterministic task, project, people, allocation, time off, archive, and notification state that resets on every page load.
 
 The prototype demonstrates a task workflow:
 
@@ -33,7 +33,7 @@ The prototype demonstrates a task workflow:
 - Project tags: `print`, `cg`, and `ai`.
 - Project tools: `Houdini`, `Comfy`, `Nanobanana`, `Blender`, and `Unreal`.
 - Archive view with aggregate counts, project/task/subtask filters, restore actions, and project bundle restore.
-- Allocation planning with exact summary/project row selection.
+- Calendar planning with Allocation, Time Off, and placeholder Milestones modes.
 - Persistent app header with `RELAY`, notification bell, and collapsible side navigation.
 - Frontend-only permissions and theme switching.
 

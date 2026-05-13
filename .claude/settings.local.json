@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(xargs grep -l \"zustand\\\\|store\\\\|hook\")",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
