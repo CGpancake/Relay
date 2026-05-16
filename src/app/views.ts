@@ -32,7 +32,7 @@ export type ViewModule = {
 export const views: ViewModule[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban, canAccess: (person) => canAccess(person, 'projects'), Component: ProjectsFeatureView },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, canAccess: (person) => canAccess(person, 'calendar'), Component: CalendarFeatureView },
-  { id: 'tasks', label: 'Tasks', icon: ListChecks, canAccess: (person) => canAccess(person, 'tasks'), Component: TasksFeatureView },
+  { id: 'tasks', label: 'Deliverables', icon: ListChecks, canAccess: (person) => canAccess(person, 'tasks'), Component: TasksFeatureView },
   { id: 'bidding', label: 'Bidding', icon: Handshake, canAccess: (person) => canAccess(person, 'bidding'), Component: BiddingFeatureView },
   { id: 'archive', label: 'Archive', icon: Archive, canAccess: (person) => canAccess(person, 'archive'), Component: ArchiveFeatureView },
   { id: 'documentation', label: 'Documentation', icon: BookOpenText, canAccess: (person) => canAccess(person, 'documentation'), Component: DocumentationFeatureView },
@@ -42,6 +42,7 @@ export const views: ViewModule[] = [
 
 export function viewFromPath(pathname: string): ViewId {
   if (pathname === '/allocation' || pathname === '/bookings' || pathname === '/goals') return 'calendar';
+  if (pathname === '/deliverables' || pathname === '/tasks') return 'tasks';
   const candidate = pathname.replace('/', '') as ViewId;
   return views.some((view) => view.id === candidate) ? candidate : 'tasks';
 }

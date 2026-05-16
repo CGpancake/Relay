@@ -230,7 +230,7 @@ function archiveSubtask(state: AppState, taskId: string, subtaskId: string, arch
       ...state.archive,
       subtasks: [{ ...subtask, taskId: task.id, taskTitle: task.title, projectId: task.projectId, archivedAt }, ...state.archive.subtasks],
     },
-    notifications: [notification(`Subtask archived: ${subtask.title}`, task, actor, state.notifications.length), ...state.notifications],
+    notifications: [notification(`Subdeliverable archived: ${subtask.title}`, task, actor, state.notifications.length), ...state.notifications],
   };
 }
 
@@ -302,6 +302,6 @@ function restoreTask(state: AppState, taskId: string, actor: string): AppState {
     ...state,
     tasks: [...state.tasks, restoredTask],
     archive: { ...state.archive, tasks: state.archive.tasks.filter((candidate) => candidate.id !== taskId) },
-    notifications: [notification(`Task restored: ${restoredTask.title}`, restoredTask, actor, state.notifications.length), ...state.notifications],
+    notifications: [notification(`Deliverable restored: ${restoredTask.title}`, restoredTask, actor, state.notifications.length), ...state.notifications],
   };
 }

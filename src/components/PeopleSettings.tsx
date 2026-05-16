@@ -5,6 +5,7 @@ import { canAdminPeople, permissionsForPermissionLevel } from '../lib/permission
 import { themeAccentChoices, themes, themeVariantForMode } from '../themes';
 import type { CalendarDayWindowSettings, CalendarMode, CalendarOverlaySettings, PermissionLevel, Person } from '../types';
 import type { ThemeAccentKey } from '../themes';
+type PersonDraft = Pick<Person, 'role' | 'permissionLevel' | 'permissions'>;
 
 export function PeopleView({
   currentUser,
@@ -20,6 +21,8 @@ export function PeopleView({
   const [role, setRole] = React.useState('Artist');
   const [permissionLevel, setPermissionLevel] = React.useState<PermissionLevel>('Artist');
   const [discipline, setDiscipline] = React.useState('Generalist');
+  const [editingPersonId, setEditingPersonId] = React.useState<string | null>(null);
+  const [personDraft, setPersonDraft] = React.useState<PersonDraft | null>(null);
 
   const addPerson = () => {
     const trimmedName = name.trim();
@@ -41,11 +44,22 @@ export function PeopleView({
     setName('');
   };
 
-  const updatePerson = (personId: string, updater: (person: Person) => Person) => {
-    if (!admin) {
-      return;
-    }
-    setPeople((current) => current.map((person) => (person.id === personId ? updater(person) : person)));
+  const beginEditPerson = (person: Person) => {
+    if (!admin) return;
+    setEditingPersonId(person.id);
+    setPersonDraft({ role: person.role, permissionLevel: person.permissionLevel, permissions: { ...person.permissions } });
+  };
+
+  const updatePersonDraft = (updater: (draft: PersonDraft) => PersonDraft) => {
+    if (!admin) return;
+    setPersonDraft((current) => (current ? updater(current) : current));
+  };
+
+  const savePerson = (personId: string) => {
+    if (!admin || !personDraft) return;
+    setPeople((current) => current.map((person) => (person.id === personId ? { ...person, ...personDraft } : person)));
+    setEditingPersonId(null);
+    setPersonDraft(null);
   };
 
   const removePerson = (personId: string) => {
@@ -53,6 +67,10 @@ export function PeopleView({
       return;
     }
     setPeople((current) => current.filter((person) => person.id !== personId));
+    if (editingPersonId === personId) {
+      setEditingPersonId(null);
+      setPersonDraft(null);
+    }
   };
 
   return (
@@ -77,7 +95,10 @@ export function PeopleView({
             <span>Views</span>
             <span>Action</span>
           </div>
-          {people.map((person) => (
+          {people.map((person) => {
+            const editing = admin && editingPersonId === person.id && personDraft;
+            const rowValue = editing ? personDraft : person;
+            return (
             <div className="people-row" key={person.id}>
               <span>
                 <strong>{person.name}</strong>
@@ -86,10 +107,10 @@ export function PeopleView({
               <span>
                 <input
                   aria-label={`Role for ${person.name}`}
-                  disabled={!admin}
-                  value={person.role}
+                  disabled={!editing}
+                  value={rowValue.role}
                   onChange={(event) =>
-                    updatePerson(person.id, (current) => ({
+                    updatePersonDraft((current) => ({
                       ...current,
                       role: event.target.value,
                     }))
@@ -99,10 +120,10 @@ export function PeopleView({
               <span>
                 <select
                   aria-label={`Permission level for ${person.name}`}
-                  disabled={!admin}
-                  value={person.permissionLevel}
+                  disabled={!editing}
+                  value={rowValue.permissionLevel}
                   onChange={(event) =>
-                    updatePerson(person.id, (current) => ({
+                    updatePersonDraft((current) => ({
                       ...current,
                       permissionLevel: event.target.value as PermissionLevel,
                       permissions: permissionsForPermissionLevel(event.target.value as PermissionLevel),
@@ -120,10 +141,10 @@ export function PeopleView({
                 {viewIds.map((viewId) => (
                   <label key={viewId}>
                     <input
-                      checked={person.permissions[viewId]}
-                      disabled={!admin}
+                      checked={rowValue.permissions[viewId]}
+                      disabled={!editing}
                       onChange={(event) =>
-                        updatePerson(person.id, (current) => ({
+                        updatePersonDraft((current) => ({
                           ...current,
                           permissions: { ...current.permissions, [viewId]: event.target.checked },
                         }))
@@ -134,13 +155,19 @@ export function PeopleView({
                   </label>
                 ))}
               </span>
-              <span>
+              <span className="people-row-actions">
+                {admin && (
+                  <button className="secondary-action" onClick={() => (editing ? savePerson(person.id) : beginEditPerson(person))} type="button">
+                    {editing ? 'Save' : 'Edit'}
+                  </button>
+                )}
                 <button className="secondary-action" disabled={!admin || person.id === currentUser.id} onClick={() => removePerson(person.id)} type="button">
                   Remove
                 </button>
               </span>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         <aside className="add-person">

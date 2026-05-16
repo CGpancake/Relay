@@ -7,5 +7,13 @@ export function ArchiveFeatureView() {
   const actions = useAppActions();
   const currentUser = state.people.find((person) => person.id === state.currentPersonId) ?? state.people[0];
 
-  return <ArchiveView archive={state.archive} currentUser={currentUser} onRestoreProject={actions.restoreProject} onRestoreTask={actions.restoreTask} />;
+  return (
+    <ArchiveView
+      activeProjects={state.projects.filter((project) => !project.archivedAt)}
+      archive={state.archive}
+      currentUser={currentUser}
+      onRestoreProject={actions.restoreProject}
+      onRestoreTask={actions.restoreTask}
+    />
+  );
 }

@@ -38,7 +38,7 @@ export function useAppActions() {
             ...current,
           ],
         }),
-      archiveTask: (taskId: string, message = 'Task archived') =>
+      archiveTask: (taskId: string, message = 'Deliverable archived') =>
         dispatch({ type: 'task/archived', taskId, archivedAt: today(), actor: currentUser.name, message }),
       archiveSubtask: (taskId: string, subtaskId: string) =>
         dispatch({ type: 'subtask/archived', taskId, subtaskId, archivedAt: today(), actor: currentUser.name }),

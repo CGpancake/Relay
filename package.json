@@ -11,6 +11,7 @@
     "test:smoke:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@annotorious/react": "^3.8.2",
     "@vitejs/plugin-react": "^5.1.1",
     "lucide-react": "^0.561.0",
     "react": "^19.2.1",

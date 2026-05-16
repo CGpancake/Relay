@@ -43,7 +43,7 @@ export const allocationStatusLabels: Record<AllocationStatus, string> = {
 export const viewLabels: Record<ViewId, string> = {
   projects: 'Projects',
   calendar: 'Calendar',
-  tasks: 'Tasks',
+  tasks: 'Deliverables',
   bidding: 'Bidding',
   archive: 'Archive',
   documentation: 'Documentation',

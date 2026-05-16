@@ -13,7 +13,7 @@ export function ProjectsFeatureView() {
     if (!project) {
       return;
     }
-    const confirmed = window.confirm(`${project.name} will be moved to Archive with its tasks and allocations. It can be restored later.`);
+    const confirmed = window.confirm(`${project.name} will be moved to Archive with its deliverables and allocations. It can be restored later.`);
     if (confirmed) {
       actions.archiveProject(projectId);
     }

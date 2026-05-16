@@ -1,22 +1,12 @@
 # Permissions
 
-Relay has frontend-only permission gates for the prototype. These gates are useful for validating product behavior, but they are not production authorization.
+Relay permissions are frontend-only prototype affordances. They demonstrate role-specific UI behavior before backend authentication or authorization exists.
 
 ## Permission levels
 
-- Admin: full access to all views and people management.
-- Manager: access to production workflow views, but not Settings by default.
-- Artist: access to project, allocation, task, archive, and documentation views by default.
-- Client: limited workflow access, with documentation available by default.
+- Admin: full access, people administration, settings, project and deliverable creation, allocation editing, time-off approval, and archive restore.
+- Manager: project and deliverable creation, allocation editing, time-off approval, archive restore, and read-only people access.
+- Artist: project, calendar allocation, deliverables, archive, and documentation access by default. Artists can edit deliverables assigned to them and their own allocation.
+- Client: limited project and documentation access, plus client-visible deliverables where the view is available.
 
-People also have visible company roles. The role is what most UI surfaces show. The permission level controls what a prototype user can access.
-
-## Per-view access
-
-Admin users can toggle access to individual views from People. This allows the prototype to test how the interface behaves when views are locked for a person.
-
-## Current user
-
-Settings includes a Current user selector. Switching users is a prototype convenience for testing permissions. It is not authentication.
-
-See also [[Settings and Themes]].
+Company role labels are shown in most app surfaces. Permission level appears in People administration controls because it is a prototype access concept.

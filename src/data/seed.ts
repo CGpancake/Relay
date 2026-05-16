@@ -1,13 +1,19 @@
 import type { Allocation, Person, Project, Task } from '../types';
 import { permissionsForPermissionLevel } from '../lib/permissions';
 
-const seedReviewVersions = (taskId: string, title: string) => [
+const seedReviewVersions = (taskId: string, projectId: string, title: string) => [
   {
     id: `${taskId}-v001`,
     label: 'v001',
     date: '2026-05-04',
     kind: 'image' as const,
     summary: `${title} first review frame`,
+    projectId,
+    shotId: `${taskId}-shot`,
+    frameStart: 1001,
+    frameEnd: 1005,
+    defaultFrame: 1001,
+    proxyFrameUrlTemplate: `/review-proxies/${projectId}/${taskId}/v001/frame-{frame}.png`,
   },
   {
     id: `${taskId}-v002`,
@@ -15,6 +21,12 @@ const seedReviewVersions = (taskId: string, title: string) => [
     date: '2026-05-05',
     kind: 'video' as const,
     summary: `${title} updated motion pass`,
+    projectId,
+    shotId: `${taskId}-shot`,
+    frameStart: 1001,
+    frameEnd: 1005,
+    defaultFrame: 1001,
+    proxyFrameUrlTemplate: `/review-proxies/${projectId}/${taskId}/v002/frame-{frame}.png`,
   },
 ];
 
@@ -134,7 +146,7 @@ const task = (
     { id: `${id}-b`, title: 'publish review material', done: status === 'done' },
     { id: `${id}-c`, title: 'close production note', done: status === 'done' },
   ],
-  reviewVersions: seedReviewVersions(id, title),
+  reviewVersions: seedReviewVersions(id, projectId, title),
   comments: seedComments(id, title),
 });
 

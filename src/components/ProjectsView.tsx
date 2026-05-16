@@ -11,13 +11,19 @@ const todayIso = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-const reviewVersionsFor = (taskId: string, title: string) => [
+const reviewVersionsFor = (taskId: string, projectId: string, title: string) => [
   {
     id: `${taskId}-v001`,
     label: 'v001',
     date: todayIso(),
     kind: 'image' as const,
     summary: `${title} first review frame`,
+    projectId,
+    shotId: `${taskId}-shot`,
+    frameStart: 1001,
+    frameEnd: 1005,
+    defaultFrame: 1001,
+    proxyFrameUrlTemplate: `/review-proxies/${projectId}/${taskId}/v001/frame-{frame}.png`,
   },
   {
     id: `${taskId}-v002`,
@@ -25,6 +31,12 @@ const reviewVersionsFor = (taskId: string, title: string) => [
     date: todayIso(),
     kind: 'video' as const,
     summary: `${title} updated review pass`,
+    projectId,
+    shotId: `${taskId}-shot`,
+    frameStart: 1001,
+    frameEnd: 1005,
+    defaultFrame: 1001,
+    proxyFrameUrlTemplate: `/review-proxies/${projectId}/${taskId}/v002/frame-{frame}.png`,
   },
 ];
 
@@ -139,10 +151,10 @@ export function ProjectsView({
           priority,
           dueDate,
           assignee,
-          description: `${selectedProject.name} task created from Projects.`,
+          description: `${selectedProject.name} deliverable created from Projects.`,
           clientVisible,
           subtasks: [],
-          reviewVersions: reviewVersionsFor(taskId, title),
+          reviewVersions: reviewVersionsFor(taskId, selectedProject.id, title),
           comments: [],
           followers: [assignee],
         },
@@ -170,9 +182,9 @@ export function ProjectsView({
           <Archive size={14} aria-hidden="true" />
           Archive project
         </button>
-        <button disabled={!selectedTaskId} onClick={() => selectedTaskId && onArchiveTask(selectedTaskId, 'Task deleted')} type="button">
+        <button disabled={!selectedTaskId} onClick={() => selectedTaskId && onArchiveTask(selectedTaskId, 'Deliverable deleted')} type="button">
           <Trash2 size={14} aria-hidden="true" />
-          Delete task
+          Delete deliverable
         </button>
       </section>
 
@@ -211,7 +223,7 @@ export function ProjectsView({
                             type="button"
                           >
                             <strong>{project.name}</strong>
-                            <small>{taskCount} tasks</small>
+                            <small>{taskCount} deliverables</small>
                             <small>{project.tags.join(', ')} / {project.tools.join(', ')}</small>
                           </button>
                         );
@@ -263,7 +275,7 @@ export function ProjectsView({
               </section>
               <div className="project-task-list">
                 {projectTasks.length === 0 ? (
-                  <p className="empty-row">No tasks for this project</p>
+                  <p className="empty-row">No deliverables for this project</p>
                 ) : (
                   projectTasks.map((task) => (
                     <article
@@ -285,7 +297,7 @@ export function ProjectsView({
                 )}
               </div>
               <section className="task-create-form">
-                <h3>create task</h3>
+                <h3>create deliverable</h3>
                 <label>
                   Title
                   <input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} disabled={!editable} />
@@ -330,7 +342,7 @@ export function ProjectsView({
                 </label>
                 <button className="primary-action" disabled={!editable || taskTitle.trim().length === 0} onClick={addTask} type="button">
                   <ListPlus size={15} aria-hidden="true" />
-                  Add task
+                  Add deliverable
                 </button>
               </section>
             </>

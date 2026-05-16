@@ -1,25 +1,22 @@
 # Navigation
 
-Relay uses a persistent header and a left navigation rail. The header contains the Relay brand button and notification bell. The sidebar contains each app view and can collapse into a narrow icon rail.
+Relay uses a left sidebar and a persistent header. The sidebar can collapse into an icon rail and expands again from the header brand or rail control.
 
 ## Views
 
-- Projects: create projects, edit project metadata, archive projects, and create tasks for a selected project.
-- Allocation: plan timed work segments across people, projects, dates, statuses, and notes.
-- Milestones: internal placeholder for future goal and milestone planning.
-- Time Off: mark pending holiday and sick leave, approve or revert selected time off stripes, and block overlapping time off; time off are visual-only and do not reduce Allocation capacity yet.
-- Tasks: inspect grouped work, filter tasks, open review panes, edit task metadata, manage subtasks, and send comments.
-- Archive: review archived projects, tasks, subtasks, and allocation bundles, then restore eligible work.
-- Documentation: browse and read the human wiki from the `Documentation/` folder.
-- People: manage people, roles, permission levels, and per-view access.
-- Settings: switch theme and current prototype user.
+- Projects: create projects, edit studio/tag/tool metadata, archive projects, and create deliverables for a selected project.
+- Calendar: plan allocation, time off, and milestones. The compatibility paths `/allocation`, `/bookings`, and `/goals` open Calendar modes.
+- Deliverables: inspect grouped work, filter deliverables, open review panes, edit metadata, manage subdeliverables, annotate review frames, and send comments.
+- Bidding: reserved prototype view.
+- Archive: review active and archived projects, archived deliverables and subdeliverables, aggregate counts, filters, restore actions, and the relationship graph.
+- Documentation: browse these bundled markdown pages with wiki links.
+- People: inspect and edit local people and permission levels where allowed.
+- Settings: choose current prototype user, theme, accent, timezone, and calendar display preferences.
 
-## Prototype routing
+## Routes
 
-Each app view maps to a simple browser path such as `/tasks`, `/projects`, or `/documentation`. Reloading one of these paths opens that view again, as long as the current prototype user has permission to access it.
-
-Milestones and Time Off are available to Admin, Manager, and Artist users only. Client users cannot access those internal planning views.
+`/deliverables` is the canonical deliverables route. `/tasks` remains a compatibility alias and opens the same view. Other current routes include `/projects`, `/calendar`, `/bidding`, `/archive`, `/documentation`, `/people`, and `/settings`.
 
 ## Notifications
 
-The notification bell stores frontend-only task update records for the current session. It is useful for testing follower behavior, but it is not a realtime or persistent notification system.
+The notification bell stores frontend-only deliverable update records for the current session. It validates follower behavior and update placement, but it is not realtime, persistent, or production authorization.

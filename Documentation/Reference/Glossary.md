@@ -1,45 +1,29 @@
 # Glossary
 
-## Allocation
+## Deliverable
 
-A planned timed segment for a person on a project and date. Allocations store start and end minutes, then derive duration.
+A unit of production work displayed in `/deliverables`. The internal prototype model is still named `Task`, but user-facing copy says deliverable.
 
-## Time Off
+## Subdeliverable
 
-The internal leave calendar for holiday and sick leave. Time Off carry pending or confirmed approval state, but they do not drive Allocation capacity yet. Overlapping time off for the same person/date/time range are blocked.
-
-## Time Off approval
-
-The pending or confirmed state on a time off. New time off always start pending. Managers and Admins can confirm selected pending time off or revert selected confirmed time off.
-
-## Time Off stripe
-
-The leave mark shown in Time Off and Allocation. Compact time off stripes fill the whole cell. Day time off stripes fill the full row height across the booked time range. Pending and confirmed use the same stripe geometry; confirmation strengthens the stripe colour.
-
-## Capacity
-
-The demo limit used for Allocation utilization and overbooking. It is fixed at 8 hours per person/day.
-
-## Milestones
-
-An internal placeholder for future goal and milestone planning.
-
-## Archive
-
-Restoreable storage for work that has been removed from active views during the current session.
-
-## Client-visible
-
-A task flag that marks work as visible to Client permission users.
-
-## Permission level
-
-The frontend-only access profile assigned to a person. Current levels are Admin, Manager, Artist, and Client.
+A checklist item inside a deliverable. Completing every subdeliverable marks the parent deliverable Done.
 
 ## Review pane
 
-The task detail surface that opens from the task board. It contains task metadata, subtasks, review versions, comments, and composer actions.
+The side detail surface opened from the deliverables board. It contains metadata, subdeliverables, review versions, annotations, comments, followers, and composer actions.
 
-## Theme
+## Client visible
 
-A complete set of surface, ink, line, and status colors used by the Relay interface.
+A deliverable flag that marks work as visible to Client permission users.
+
+## Archive
+
+The in-memory restoreable store for projects, deliverables, subdeliverables, and allocation bundles removed from active views.
+
+## Relationship graph
+
+An Archive panel that displays studios, projects, deliverables, subdeliverables, tags, tools, users, status, phase, and priority as an interactive canvas graph.
+
+## Prototype state
+
+Seeded local React state. Most data resets on reload; selected theme, current user, timezone, and display preferences persist in local storage.

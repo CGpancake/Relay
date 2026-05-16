@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AllocationSelectionCell, AllocationView, Person } from '../../types';
 import { datesBetween } from '../../lib/date';
-import { datesForView, shiftDateByView, zonedNow } from './index';
+import { bufferedDatesForView, shiftDateByView, zonedNow } from './index';
 
 export type CalendarState = {
   view: AllocationView;
@@ -44,7 +44,7 @@ export function useCalendarState({ timezone, people, initialView = 'week', onCel
   const [manualProjectRows, setManualProjectRows] = React.useState<Record<string, string[]>>({});
   const [projectPickerPersonId, setProjectPickerPersonId] = React.useState<string | null>(null);
 
-  const dates = React.useMemo(() => datesForView(view, selectedDate), [view, selectedDate]);
+  const dates = React.useMemo(() => bufferedDatesForView(view, selectedDate).dates, [view, selectedDate]);
   const now = React.useMemo(() => zonedNow(timezone), [timezone]);
   const today = now.date;
 

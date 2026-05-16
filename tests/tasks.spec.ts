@@ -2,14 +2,70 @@ import { expect, test, type Page } from '@playwright/test';
 import { themes } from '../src/themes';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/tasks');
+  await page.goto('/deliverables');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+});
+
+test('deliverables route is canonical and tasks remains a compatibility alias', async ({ page }) => {
+  await expect(page).toHaveURL(/\/deliverables$/);
+  await expect(page.getByRole('heading', { name: 'deliverables board' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Deliverables/ })).toBeVisible();
+
+  await page.goto('/tasks');
+  await expect(page.getByRole('heading', { name: 'deliverables board' })).toBeVisible();
+  await expect(page).toHaveURL(/\/deliverables$/);
 });
 
 async function openCalendar(page: Page, mode: 'Allocation' | 'Time Off' | 'Milestones' = 'Allocation') {
   await page.getByRole('button', { name: /Calendar/ }).click();
   await page.getByRole('button', { name: mode, exact: true }).click();
+}
+
+async function canvasPixelStats(page: Page, testId = 'archive-graph-canvas') {
+  return page.getByTestId(testId).evaluate((canvas) => {
+    const element = canvas as HTMLCanvasElement;
+    const context = element.getContext('2d')!;
+    const { data } = context.getImageData(0, 0, element.width, element.height);
+    let painted = 0;
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    for (let index = 0; index < data.length; index += 16) {
+      if (data[index + 3] > 0) {
+        painted += 1;
+        red += data[index];
+        green += data[index + 1];
+        blue += data[index + 2];
+      }
+    }
+    return { painted, red, green, blue };
+  });
+}
+
+async function clickVisibleGraphNode(page: Page) {
+  const canvas = page.getByTestId('archive-graph-canvas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const positions = [
+    [0.47, 0.74],
+    [0.5, 0.5],
+    [0.42, 0.42],
+    [0.62, 0.52],
+    [0.24, 0.26],
+    [0.78, 0.66],
+    [0.72, 0.18],
+    [0.88, 0.42],
+  ];
+  for (const [x, y] of positions) {
+    await canvas.click({ position: { x: box!.width * x, y: box!.height * y } });
+    if (await page.getByTestId('archive-graph-detail').count()) return;
+  }
+  throw new Error('No graph node was selectable at sampled positions');
+}
+
+async function contentScrollTop(page: Page) {
+  return page.locator('.content').evaluate((element) => element.scrollTop);
 }
 
 test('task groups and seed rows render', async ({ page }) => {
@@ -178,7 +234,7 @@ test('creating a project generates internal code and places the selected studio'
   await expect(page.getByTestId('project-row-signal-field-tests-17')).toBeVisible();
   await expect(page.getByLabel('Project metadata').getByLabel('Studio')).toHaveValue('hero-next-door');
 
-  await page.getByRole('button', { name: /Tasks/ }).click();
+  await page.getByRole('button', { name: /Deliverables/ }).click();
   await expect(page.getByLabel('Project')).toContainText('Signal Field Tests');
 
   await openCalendar(page, 'Allocation');
@@ -231,10 +287,10 @@ test('studio SVG logos stay visible in light and dark themes', async ({ page }) 
   );
 });
 
-test('tasks layout remains usable at mobile width', async ({ page }) => {
+test('deliverables layout remains usable at mobile width', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 820 });
-  await expect(page.getByRole('heading', { name: 'task board' })).toBeVisible();
-  await expect(page.getByLabel('Task filters')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'deliverables board' })).toBeVisible();
+  await expect(page.getByLabel('Deliverable filters')).toBeVisible();
   await page.getByLabel('User').selectOption('all');
   await expect(page.getByTestId('task-row-task-novartis-3d-sh-09')).toBeVisible();
 
@@ -249,6 +305,240 @@ test('clicking a row opens task pane', async ({ page }) => {
   await expect(page.getByTestId('task-pane')).toHaveClass(/is-open/);
   await expect(page.getByRole('heading', { name: '3D pass SH_09' })).toBeVisible();
   await page.screenshot({ path: 'test-results/relay-pane-open.png', fullPage: true });
+});
+
+test('elements review thumbnails open fullscreen annotation review by exact version and frame', async ({ page }) => {
+  const annotationRequests: string[] = [];
+  await page.route('**/annotations?**', async (route) => {
+    annotationRequests.push(route.request().url());
+    await route.fulfill({ contentType: 'application/json', json: [] });
+  });
+
+  await page.getByLabel('User').selectOption('all');
+  await page.getByTestId('task-row-task-novartis-3d-sh-09').click();
+  await expect(page.getByTestId(/^review-version-thumbnail-/)).toHaveCount(1);
+  await expect(page.getByTestId('task-review-panel').getByText('Review versions')).toHaveCount(0);
+  await expect(page.getByTestId('task-review-panel')).not.toContainText('Frames');
+  await expect(page.getByTestId('review-version-thumbnail-v05').locator('img')).toHaveAttribute('src', /\/demo-review\/elements\/V05\/Elements_v05\.1060\.png$/);
+  await expect(page.getByTestId('review-version-thumbnail-v05')).toContainText('Latest');
+  await expect(page.getByTestId('review-version-thumbnail-v05')).toHaveCSS('box-shadow', /none|rgba\(0, 0, 0, 0\)/);
+  const thumbnailFit = await page.getByTestId('review-version-thumbnail-v05').locator('img').evaluate((element) => getComputedStyle(element).objectFit);
+  expect(thumbnailFit).toBe('cover');
+  await expect(page.getByRole('button', { name: 'Previous review version' })).not.toHaveCSS('background-color', /rgba\(0, 0, 0, 0\)|transparent/);
+  await expect(page.getByRole('button', { name: 'Next review version' })).not.toHaveCSS('background-color', /rgba\(0, 0, 0, 0\)|transparent/);
+  const latestBadgeStyle = await page.locator('.review-latest-badge').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      borderStyle: style.borderStyle,
+      color: style.color,
+      fontSize: style.fontSize,
+      top: style.top,
+    };
+  });
+  const versionBadgeStyle = await page.locator('.review-version-badge').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      borderStyle: style.borderStyle,
+      fontSize: style.fontSize,
+      top: style.top,
+    };
+  });
+  expect(latestBadgeStyle.background).toBe(versionBadgeStyle.background);
+  expect(latestBadgeStyle.borderStyle).toBe(versionBadgeStyle.borderStyle);
+  expect(latestBadgeStyle.fontSize).toBe(versionBadgeStyle.fontSize);
+  expect(latestBadgeStyle.top).toBe(versionBadgeStyle.top);
+  const activeAccentColor = await page.locator('.relay-shell').evaluate((element) => {
+    const probe = document.createElement('span');
+    probe.style.color = getComputedStyle(element).getPropertyValue('--color-active').trim();
+    element.appendChild(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  expect(latestBadgeStyle.color).toBe(activeAccentColor);
+
+  await page.getByRole('button', { name: 'Previous review version' }).click();
+  await expect(page.getByTestId('review-version-thumbnail-v04')).toBeVisible();
+  await page.getByRole('button', { name: 'Next review version' }).click();
+  await expect(page.getByTestId('review-version-thumbnail-v05')).toBeVisible();
+
+  await page.getByTestId('review-version-thumbnail-v05').first().click();
+  await expect(page.getByTestId('fullscreen-review')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Previous frame' })).toHaveCount(0);
+  await expect(page.getByTestId('review-frame-counter')).toBeVisible();
+  await page.getByLabel('Fullscreen version for 3D pass SH_09').selectOption('elements-v01');
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1060 / 1060');
+  await expect(page.getByTestId('review-frame-image')).toHaveAttribute('src', /\/demo-review\/elements\/V01\/Elements_V01\.1060\.png$/);
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1059 / 1060');
+  await expect(page.getByTestId('review-frame-image')).toHaveAttribute('src', /\/demo-review\/elements\/V01\/Elements_V01\.1059\.png$/);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1060 / 1060');
+  await expect(page.getByRole('button', { name: 'Show annotation tools' })).toBeVisible();
+  await expect(page.getByTestId('annotation-toolbar-group')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toHaveCount(0);
+  await expect(page.getByLabel('A/B split angle degrees')).toHaveCount(0);
+  await expect(page.getByLabel('A/B split angle slider')).toHaveCount(0);
+  await expect(page.getByLabel('Review zoom')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Zoom out' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'A/B preview' })).toBeVisible();
+  await expect(page.getByLabel('Review timeline')).toBeVisible();
+  await page.getByRole('button', { name: 'Show annotation tools' }).click();
+  await expect(page.getByTestId('annotation-toolbar-group')).toBeVisible();
+  await expect(page.locator('footer .annotation-color-palette')).toHaveCount(0);
+  await expect(page.locator('header .annotation-color-palette')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toHaveClass(/is-active/);
+  await page.getByRole('button', { name: 'Draw box annotation' }).click();
+  await expect(page.getByRole('button', { name: 'Draw box annotation' })).toHaveClass(/is-active/);
+  await expect(page.getByRole('button', { name: 'Select annotations' })).not.toHaveClass(/is-active/);
+  await page.getByRole('button', { name: 'Draw pen annotation' }).click();
+  await expect(page.getByRole('button', { name: 'Draw pen annotation' })).toHaveClass(/is-active/);
+  await expect(page.getByRole('button', { name: 'Delete selected annotation' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Select annotations' }).click();
+  await page.getByRole('button', { name: 'Hide annotation tools' }).click();
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Draw box annotation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Draw pen annotation' })).toHaveCount(0);
+  await expect(page.locator('header .annotation-color-palette')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'A/B preview' })).toBeVisible();
+  await expect(page.getByLabel('Review zoom')).toHaveCount(0);
+  await expect(page.getByLabel('Review timeline')).toBeVisible();
+  await page.getByRole('button', { name: 'Show annotation tools' }).click();
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toBeVisible();
+  const normalImageWidth = await page.getByTestId('review-frame-image').evaluate((element) => element.getBoundingClientRect().width);
+  await expect(page.getByLabel('Review zoom')).toHaveValue('100');
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.getByLabel('Review zoom')).toHaveValue('110');
+  await expect.poll(() => page.getByTestId('review-frame-image').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(normalImageWidth);
+  await page.getByLabel('Review zoom').fill('200');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('200');
+  await expect(page.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('=');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('200');
+  await page.keyboard.press('-');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('190');
+  await page.getByLabel('Review zoom').fill('100');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('100');
+  await expect(page.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('-');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('100');
+
+  await page.getByLabel('Fullscreen version for 3D pass SH_09').selectOption('elements-v02');
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1047 / 1047');
+  await expect(page.getByTestId('review-frame-image')).toHaveAttribute('src', /\/demo-review\/elements\/V02\/Elements_V02\.1047\.png$/);
+
+  await page.getByRole('button', { name: 'A/B preview' }).click();
+  await expect(page.getByTestId('ab-preview')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Draw box annotation' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Draw pen annotation' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Delete selected annotation' })).toBeDisabled();
+  await expect(page.getByLabel('A/B left version')).toHaveValue('elements-v02');
+  await expect(page.getByLabel('A/B right version')).toHaveValue('elements-v03');
+  const leftControlBox = await page.getByLabel('A/B left version').boundingBox();
+  const rightControlBox = await page.getByLabel('A/B right version').boundingBox();
+  expect(leftControlBox).not.toBeNull();
+  expect(rightControlBox).not.toBeNull();
+  expect(leftControlBox!.x).toBeLessThan(rightControlBox!.x);
+  expect(leftControlBox!.width).toBeLessThanOrEqual(120);
+  expect(rightControlBox!.width).toBeLessThanOrEqual(120);
+  const initialClipPath = await page.locator('.ab-right-clip').evaluate((element) => getComputedStyle(element).clipPath);
+  await page.getByLabel('A/B split angle degrees').fill('25');
+  await expect(page.getByLabel('A/B split angle slider')).toHaveValue('25');
+  await expect.poll(() => page.locator('.ab-right-clip').evaluate((element) => getComputedStyle(element).clipPath)).not.toBe(initialClipPath);
+  await expect(page.getByRole('button', { name: 'Drag A/B split' })).not.toHaveCSS('background-color', await page.locator('.relay-shell').evaluate((element) => getComputedStyle(element).getPropertyValue('--color-active').trim()));
+  const lineBeforeDrag = await page.locator('.ab-split-line line').evaluate((element) => ({
+    x1: element.getAttribute('x1'),
+    x2: element.getAttribute('x2'),
+    y1: element.getAttribute('y1'),
+    y2: element.getAttribute('y2'),
+  }));
+  const handleBox = await page.getByRole('button', { name: 'Drag A/B split' }).boundingBox();
+  expect(handleBox).not.toBeNull();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + 40, handleBox!.y + handleBox!.height / 2 + 20);
+  await page.mouse.up();
+  await expect.poll(() => page.locator('.ab-split-line line').evaluate((element) => ({
+    x1: element.getAttribute('x1'),
+    x2: element.getAttribute('x2'),
+    y1: element.getAttribute('y1'),
+    y2: element.getAttribute('y2'),
+  }))).not.toEqual(lineBeforeDrag);
+  const abImageWidth = await page.locator('.ab-image-left').evaluate((element) => element.getBoundingClientRect().width);
+  await page.getByLabel('Review zoom').fill('200');
+  await expect(page.getByLabel('Review zoom')).toHaveValue('200');
+  await expect.poll(() => page.locator('.ab-image-left').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(abImageWidth);
+  const zoomLayerBox = await page.getByTestId('review-zoom-layer').boundingBox();
+  expect(zoomLayerBox).not.toBeNull();
+  const panBefore = await page.getByTestId('review-zoom-layer').getAttribute('data-pan-x');
+  await page.mouse.move(zoomLayerBox!.x + 12, zoomLayerBox!.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(zoomLayerBox!.x + 52, zoomLayerBox!.y + 36);
+  await page.mouse.up();
+  await expect.poll(async () => page.getByTestId('review-zoom-layer').getAttribute('data-pan-x')).not.toBe(panBefore);
+  await page.getByLabel('A/B split angle slider').evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set;
+    valueSetter?.call(input, '-30');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await expect(page.getByLabel('A/B split angle degrees')).toHaveValue('-30');
+  await page.getByRole('button', { name: 'A/B preview' }).click();
+
+  await page.getByRole('button', { name: 'Previous fullscreen review version' }).click();
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1060 / 1060');
+
+  await page.keyboard.press('ArrowLeft');
+  await page.getByLabel('Playback FPS').fill('12');
+  await page.getByRole('button', { name: 'Play playback' }).click();
+  await expect(page.getByTestId('annotated-frame-layer')).toHaveClass(/annotations-hidden/);
+  await expect(page.getByRole('button', { name: 'Select annotations' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Draw box annotation' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Draw pen annotation' })).toBeDisabled();
+  await expect(page.getByTestId('review-frame-counter')).toHaveText('Frame 1060 / 1060');
+  await expect(page.getByRole('button', { name: 'Play playback' })).toBeVisible();
+  await expect(page.getByTestId('annotated-frame-layer')).not.toHaveClass(/annotations-hidden/);
+  await page.keyboard.press('ArrowLeft');
+  await page.getByLabel('Playback FPS').fill('60');
+  await page.getByRole('button', { name: 'Enable loop playback' }).click();
+  await page.getByRole('button', { name: 'Play playback' }).click();
+  await expect(page.getByRole('button', { name: 'Pause playback' })).toBeVisible();
+  await expect.poll(async () => {
+    const text = await page.getByTestId('review-frame-counter').textContent();
+    return Number(text?.match(/Frame (\d+)/)?.[1] ?? 0);
+  }).toBeLessThan(1059);
+  await page.getByRole('button', { name: 'Pause playback' }).click();
+  await expect(page.getByTestId('annotated-frame-layer')).not.toHaveClass(/annotations-hidden/);
+
+  const shellBox = await page.locator('.fullscreen-review-shell').boundingBox();
+  const footerBox = await page.locator('.fullscreen-playback-controls').boundingBox();
+  expect(shellBox).not.toBeNull();
+  expect(footerBox).not.toBeNull();
+  expect(footerBox!.x).toBeGreaterThanOrEqual(shellBox!.x);
+  expect(footerBox!.x + footerBox!.width).toBeLessThanOrEqual(shellBox!.x + shellBox!.width + 1);
+  expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(shellBox!.y + shellBox!.height + 1);
+
+  await page.getByLabel('Fullscreen version for 3D pass SH_09').selectOption('elements-v02');
+  await page.getByLabel('Fullscreen message for V02').fill('V02 scoped note');
+  await page.getByRole('button', { name: 'Send fullscreen comment' }).click();
+  await expect(page.getByTestId('fullscreen-version-comments')).toContainText('V02 scoped note');
+  await page.getByLabel('Fullscreen version for 3D pass SH_09').selectOption('elements-v01');
+  await expect(page.getByTestId('fullscreen-version-comments')).toContainText('V02 scoped note');
+
+  await expect.poll(() => annotationRequests.length).toBeGreaterThanOrEqual(4);
+  const requestParams = annotationRequests.map((url) => new URL(url).searchParams);
+  expect(requestParams.some((params) => params.get('version_id') === 'elements-v01' && params.get('frame_number') === '1059')).toBe(true);
+  expect(requestParams.some((params) => params.get('version_id') === 'elements-v02' && params.get('frame_number') === '1047')).toBe(true);
+  expect(requestParams.every((params) => params.has('project_id') && params.has('shot_id') && params.has('version_id') && params.has('frame_number'))).toBe(true);
 });
 
 test('subtask toggles update progress', async ({ page }) => {
@@ -320,10 +610,19 @@ test('seed people separate company role from permission level and remain editabl
   await expect(page.getByLabel('Role for Aryaan Arora')).toHaveValue('Artist');
   await expect(page.getByLabel('Role for Billy Towsend')).toHaveValue('Artist');
 
+  await expect(page.getByLabel('Role for Billy Towsend')).toBeDisabled();
+  await expect(page.getByLabel('Permission level for Billy Towsend')).toBeDisabled();
+  const billyRow = page.locator('.people-row').filter({ hasText: 'Billy Towsend' });
+  await billyRow.getByRole('button', { name: 'Edit' }).click();
   await page.getByLabel('Role for Billy Towsend').fill('Lead Artist');
   await page.getByLabel('Permission level for Billy Towsend').selectOption('Manager');
+  await expect(page.locator('.permission-grid').last().getByRole('checkbox').first()).toBeChecked();
+  await billyRow.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByLabel('Role for Billy Towsend')).toHaveValue('Lead Artist');
   await expect(page.getByLabel('Permission level for Billy Towsend')).toHaveValue('Manager');
+  await expect(page.getByLabel('Role for Billy Towsend')).toBeDisabled();
+  await expect(billyRow.getByRole('button', { name: 'Remove' })).toBeEnabled();
+  await expect(page.locator('.people-row').filter({ hasText: 'James Green' }).getByRole('button', { name: 'Remove' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Add person' })).toBeEnabled();
 
   await page.getByRole('button', { name: /Settings/ }).click();
@@ -337,18 +636,20 @@ test('seed people separate company role from permission level and remain editabl
 
 test('client role cannot access restricted views', async ({ page }) => {
   await page.getByRole('button', { name: /People/ }).click();
+  await page.locator('.people-row').filter({ hasText: 'Billy Towsend' }).getByRole('button', { name: 'Edit' }).click();
   await page.getByLabel('Role for Billy Towsend').fill('Client Reviewer');
   await page.getByLabel('Permission level for Billy Towsend').selectOption('Client');
+  await page.locator('.people-row').filter({ hasText: 'Billy Towsend' }).getByRole('button', { name: 'Save' }).click();
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByLabel('Current user').selectOption('person-artist-c');
 
-  await expect(page.getByRole('button', { name: /Tasks/ })).toBeEnabled();
+  await expect(page.getByRole('button', { name: /Deliverables/ })).toBeEnabled();
   await expect(page.getByRole('button', { name: /Documentation/ })).toBeEnabled();
   await expect(page.getByRole('button', { name: /Calendar/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Bidding/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /People/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Settings/ })).toBeDisabled();
-  await page.getByRole('button', { name: /Tasks/ }).click();
+  await page.getByRole('button', { name: /Deliverables/ }).click();
   await page.getByLabel('User').selectOption('all');
   await expect(page.getByTestId('task-row-task-novartis-3d-sh-09')).not.toBeVisible();
   await expect(page.getByTestId('task-row-task-novartis-comp-sh-09')).toBeVisible();
@@ -369,7 +670,7 @@ test('primary navigation order exposes one calendar entry', async ({ page }) => 
   expect(labels).toEqual([
     'Projects',
     'Calendar',
-    'Tasks',
+    'Deliverables',
     'Bidding',
     'Archive',
     'Documentation',
@@ -447,6 +748,26 @@ test('time off creates full-day marks and updates selected entries to hourly ran
   await expect(page.getByTestId(/time-off-overlay-sick-leave-pending/)).toBeVisible();
 });
 
+test('pending time off can be deleted while confirmed time off requires revert first', async ({ page }) => {
+  await openCalendar(page, 'Time Off');
+  await page.getByLabel('Time off date').fill('2026-05-05');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await page.getByTestId(/time-off-overlay-holiday-pending/).click();
+  await expect(page.getByRole('button', { name: 'Delete pending time off' })).toBeVisible();
+  await page.getByRole('button', { name: 'Delete pending time off' }).click();
+  await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toHaveCount(0);
+  await expect(page.getByTestId('time-off-selection-count')).toHaveText('0 selected');
+  await expect(page.getByRole('button', { name: 'Delete pending time off' })).toHaveCount(0);
+
+  await page.getByTestId('calendar-cell-person-manager-2026-05-06').click();
+  await page.getByRole('button', { name: 'Apply time off' }).click();
+  await page.getByTestId(/time-off-overlay-holiday-pending/).click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await page.getByTestId(/time-off-overlay-holiday-confirmed/).click();
+  await expect(page.getByRole('button', { name: 'Delete pending time off' })).toHaveCount(0);
+});
+
 test('artist time off starts pending and managers can confirm or revert time off', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('relay:current-person', 'person-artist-a'));
   await page.reload();
@@ -475,8 +796,10 @@ test('artist time off starts pending and managers can confirm or revert time off
   await expect(page.getByTestId('time-off-selection-count')).toHaveText('1 selected');
   await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Revert to pending' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete pending time off' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm' }).click();
   await expect(page.getByTestId(/time-off-overlay-holiday-confirmed/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete pending time off' })).toHaveCount(0);
   const confirmedCompactStyles = await page.getByTestId(/time-off-overlay-holiday-confirmed/).evaluate((element) => {
     const styles = getComputedStyle(element, '::before');
     const box = element.getBoundingClientRect();
@@ -551,12 +874,22 @@ test('calendar date arrows move by active view unit', async ({ page }) => {
 
 test('calendar overlay defaults live in settings and active mode overlay is forced on', async ({ page }) => {
   await page.getByRole('button', { name: /Settings/ }).click();
+  await page.locator('.calendar-overlay-settings').getByLabel('Allocation').uncheck();
   await page.locator('.calendar-overlay-settings').getByLabel('Time Off').uncheck();
+  await expect(page.locator('.calendar-overlay-settings').getByLabel('Milestones')).toBeDisabled();
   await page.reload();
+  await expect(page.locator('.calendar-overlay-settings').getByLabel('Allocation')).not.toBeChecked();
   await expect(page.locator('.calendar-overlay-settings').getByLabel('Time Off')).not.toBeChecked();
+  await expect(page.locator('.calendar-overlay-settings').getByLabel('Milestones')).not.toBeChecked();
+
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
+  await expect(page.getByTestId('calendar-project-cell-person-manager-novartis-novartis-2026-05-04').locator('.allocation-band')).toBeVisible();
 
   await openCalendar(page, 'Time Off');
   await page.getByLabel('Time off date').fill('2026-05-05');
+  await expect(page.getByTestId('calendar-project-cell-person-manager-novartis-novartis-2026-05-04').locator('.allocation-band')).toHaveCount(0);
   await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
   await page.getByRole('button', { name: 'Apply time off' }).click();
   await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
@@ -571,7 +904,7 @@ test('calendar overlay defaults live in settings and active mode overlay is forc
   await expect(page.getByTestId(/time-off-overlay-holiday-pending/)).toBeVisible();
 });
 
-test('day view padding settings persist and drive the focused day scale', async ({ page }) => {
+test('day view padding settings persist but day timeline shows the full 24 hour scale', async ({ page }) => {
   await page.getByRole('button', { name: /Settings/ }).click();
   await expect(page.getByLabel('Day past padding')).toHaveValue('2');
   await expect(page.getByLabel('Day upcoming padding')).toHaveValue('10');
@@ -583,9 +916,11 @@ test('day view padding settings persist and drive the focused day scale', async 
 
   await openCalendar(page, 'Allocation');
   await page.getByRole('button', { name: 'day' }).click();
-  await page.getByLabel('Selected date').fill('2026-05-14');
+  await page.getByLabel('Selected date').fill('2026-05-15');
+  await expect(page.locator('.day-scale')).toContainText('00:00');
   await expect(page.locator('.day-scale')).toContainText('09:00');
-  await expect(page.locator('.day-scale')).not.toContainText('22:00');
+  await expect(page.locator('.day-scale')).toContainText('22:00');
+  await expect(page.locator('.day-scale')).toContainText('24:00');
 });
 
 test('time off visibility follows permission level', async ({ page }) => {
@@ -606,30 +941,238 @@ test('documentation view browses bundled markdown and resolves wiki links', asyn
   await page.reload();
 
   await expect(page.getByRole('heading', { name: 'documentation' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Welcome to Relay' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Projects and Tasks/ })).toBeVisible();
-  await expect(page.locator('.documentation-browser').getByRole('button', { name: 'Task Board' })).not.toBeVisible();
-  await page.getByRole('button', { name: /Projects and Tasks/ }).click();
-  await expect(page.locator('.documentation-browser').getByRole('button', { name: 'Task Board' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Projects and Deliverables/ })).toBeVisible();
+  await expect(page.locator('.documentation-browser').getByRole('button', { name: 'Deliverables Board' })).not.toBeVisible();
+  await page.getByRole('button', { name: /Projects and Deliverables/ }).click();
+  await expect(page.locator('.documentation-browser').getByRole('button', { name: 'Deliverables Board' })).toBeVisible();
 
-  await page.getByTestId('documentation-reader').getByRole('button', { name: 'Task Board' }).click();
-  await expect(page.getByRole('heading', { name: 'Task Board' })).toBeVisible();
-  await expect(page.getByTestId('documentation-reader')).toContainText('The task board is the main place to inspect and update work.');
+  await page.getByTestId('documentation-reader').getByRole('button', { name: 'Deliverables Board' }).click();
+  await expect(page.getByRole('heading', { name: 'Deliverables Board' })).toBeVisible();
+  await expect(page.getByTestId('documentation-reader')).toContainText('The deliverables board is the main place to inspect and update production work.');
 
   await page.getByTestId('documentation-reader').getByRole('button', { name: 'Archive and Restore' }).click();
   await expect(page.getByRole('heading', { name: 'Archive and Restore' })).toBeVisible();
 });
 
 test('archive project rows use full project names without visible codes', async ({ page }) => {
+  await page.getByTitle('Archive').click();
+  await expect(page.getByTestId('archive-filter-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Archive numbers/ })).toBeVisible();
+  await expect(page.locator('.archive-summary .stat-active')).toHaveCount(0);
+  await page.getByRole('button', { name: /Archive numbers/ }).click();
+  await expect(page.locator('.archive-summary .stat-active')).toContainText('Active projects');
+  await expect(page.locator('.archive-summary .stat-active')).toContainText('16');
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toContainText('Active');
+  await expect(page.getByTestId('archive-project-novartis-novartis').getByRole('button', { name: 'Restore' })).toHaveCount(0);
+
   await page.getByRole('button', { name: 'Projects', exact: true }).click();
   await page.getByTestId('studio-toggle-bonfire').click();
   await page.getByTestId('project-row-novartis-novartis').click();
   page.on('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Archive project' }).click();
 
-  await page.getByRole('button', { name: 'Archive', exact: true }).click();
+  await page.getByTitle('Archive').click();
+  await page.getByRole('button', { name: /Archive numbers/ }).click();
+  await expect(page.locator('.archive-summary .stat-active')).toContainText('15');
   await expect(page.getByTestId('archive-project-novartis-novartis')).toContainText('Novartis Novartis');
+  await expect(page.getByTestId('archive-project-novartis-novartis')).not.toContainText('Active');
+  await expect(page.getByTestId('archive-project-novartis-novartis').getByRole('button', { name: 'Restore' })).toBeVisible();
   await expect(page.getByTestId('archive-project-novartis-novartis')).not.toContainText('NOV45');
+
+  await expect(page.getByTestId('archive-graph')).toBeVisible();
+  await expect(page.locator('.archive-workspace .archive-filters')).toBeVisible();
+  await expect(page.locator('.archive-workspace .archive-graph-panel')).toBeVisible();
+  await expect(page.getByTestId('archive-graph-canvas')).toBeVisible();
+  await expect.poll(async () => (await canvasPixelStats(page)).painted).toBeGreaterThan(1000);
+  const archiveFilters = page.getByTestId('archive-filter-panel');
+  const workspaceLayout = await page.locator('.archive-workspace').evaluate((workspace) => {
+    const [filters, graph] = Array.from(workspace.children) as HTMLElement[];
+    return {
+      filtersWidth: filters.getBoundingClientRect().width,
+      graphWidth: graph.getBoundingClientRect().width,
+    };
+  });
+  expect(workspaceLayout.filtersWidth / workspaceLayout.graphWidth).toBeGreaterThan(0.92);
+  expect(workspaceLayout.filtersWidth / workspaceLayout.graphWidth).toBeLessThan(1.08);
+  await expect(page.getByLabel('Open graph controls')).toBeVisible();
+  await expect(page.getByTestId('archive-graph-controls')).not.toContainText('Forces');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-zoom'))).not.toBe(1);
+  await page.waitForTimeout(760);
+  const fittedViewBefore = await page.getByTestId('archive-graph').evaluate((element) => ({
+    x: Number(element.getAttribute('data-view-x')),
+    y: Number(element.getAttribute('data-view-y')),
+    zoom: Number(element.getAttribute('data-zoom')),
+  }));
+  await page.getByLabel('Fit graph').click();
+  const fittedViewAfter = await page.getByTestId('archive-graph').evaluate((element) => ({
+    x: Number(element.getAttribute('data-view-x')),
+    y: Number(element.getAttribute('data-view-y')),
+    zoom: Number(element.getAttribute('data-zoom')),
+  }));
+  expect(Math.abs(fittedViewAfter.x - fittedViewBefore.x)).toBeLessThan(3);
+  expect(Math.abs(fittedViewAfter.y - fittedViewBefore.y)).toBeLessThan(3);
+  expect(Math.abs(fittedViewAfter.zoom - fittedViewBefore.zoom)).toBeLessThan(0.03);
+  await page.getByLabel('Open graph controls').click();
+  const archiveCheckboxBox = await archiveFilters.getByLabel('Active').boundingBox();
+  const graphCheckboxBox = await page.getByTestId('archive-graph-controls').getByLabel('Labels').boundingBox();
+  expect(archiveCheckboxBox?.width).toBeLessThanOrEqual(16);
+  expect(archiveCheckboxBox?.height).toBeLessThanOrEqual(16);
+  expect(graphCheckboxBox?.width).toBeLessThanOrEqual(16);
+  expect(graphCheckboxBox?.height).toBeLessThanOrEqual(16);
+  const centerRangeBox = await page.getByLabel('Center force').boundingBox();
+  const linkRangeBox = await page.getByLabel('Link distance').boundingBox();
+  expect(centerRangeBox?.height).toBeLessThanOrEqual(20);
+  expect(linkRangeBox?.height).toBeLessThanOrEqual(20);
+  await expect(page.getByTestId('archive-graph-controls')).not.toContainText('Filters');
+  await expect(page.getByTestId('archive-graph-controls')).not.toContainText('Groups');
+  await expect(page.getByTestId('archive-graph-controls')).toContainText('Display');
+  await expect(page.getByTestId('archive-graph-controls')).toContainText('Forces');
+  await expect(page.getByTestId('archive-graph-controls').getByLabel('Arrows')).not.toBeChecked();
+  const linkThickness = page.getByLabel('Link thickness');
+  await expect(linkThickness).toHaveValue(await linkThickness.getAttribute('min') ?? '');
+  for (const sliderName of ['Center force', 'Repel force', 'Link force', 'Link distance']) {
+    const slider = page.getByLabel(sliderName);
+    await expect(slider).toHaveValue(await slider.getAttribute('min') ?? '');
+  }
+  const checkedColor = await archiveFilters.getByLabel('Active').evaluate((element) => getComputedStyle(element).color);
+  const activeToken = await page.locator('.relay-shell').evaluate((element) => getComputedStyle(element).getPropertyValue('--color-active').trim());
+  expect(checkedColor).not.toBe(activeToken);
+
+  const allNodes = Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'));
+  await page.getByLabel('Search archive').fill('Novartis');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeLessThan(allNodes);
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toBeVisible();
+  await page.getByLabel('Search archive').fill('');
+  await archiveFilters.getByLabel('Project tag').selectOption('cg');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeLessThan(allNodes);
+  await archiveFilters.getByLabel('Project tag').selectOption('all');
+  await archiveFilters.getByLabel('Project tool').selectOption('Photoshop');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeLessThan(allNodes);
+  await archiveFilters.getByLabel('Project tool').selectOption('all');
+  await archiveFilters.getByLabel('Deliverable status').selectOption('done');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeLessThan(allNodes);
+  await archiveFilters.getByLabel('Deliverable status').selectOption('all');
+  await archiveFilters.getByLabel('Deliverable phase').selectOption('delivery');
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeLessThan(allNodes);
+  await archiveFilters.getByLabel('Deliverable phase').selectOption('all');
+  await archiveFilters.getByLabel('Active').uncheck();
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toBeVisible();
+  await archiveFilters.getByLabel('Archived').uncheck();
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toHaveCount(0);
+  await archiveFilters.getByLabel('Active').check();
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toHaveCount(0);
+  await archiveFilters.getByLabel('Archived').check();
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toBeVisible();
+  await archiveFilters.getByLabel('Projects').uncheck();
+  await expect(page.getByTestId('archive-project-novartis-novartis')).toHaveCount(0);
+  await archiveFilters.getByLabel('Projects').check();
+
+  const canvasBox = await page.getByTestId('archive-graph-canvas').boundingBox();
+  expect(canvasBox).not.toBeNull();
+  await page.locator('.content').evaluate((element) => { element.scrollTop = 12; });
+  const scrolledCanvasBox = await page.getByTestId('archive-graph-canvas').boundingBox();
+  expect(scrolledCanvasBox).not.toBeNull();
+  const scrollBeforeWheel = await contentScrollTop(page);
+  if (Number(await page.getByTestId('archive-graph').getAttribute('data-zoom')) <= 0.36) {
+    await page.getByLabel('Zoom in graph').click();
+  }
+  const zoomBeforeWheel = Number(await page.getByTestId('archive-graph').getAttribute('data-zoom'));
+  await page.mouse.move(scrolledCanvasBox!.x + scrolledCanvasBox!.width * 0.5, scrolledCanvasBox!.y + scrolledCanvasBox!.height * 0.5);
+  await page.mouse.wheel(0, 240);
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-zoom'))).toBeLessThan(zoomBeforeWheel);
+  await expect.poll(async () => contentScrollTop(page)).toBe(scrollBeforeWheel);
+  const viewBeforeMiddlePan = await page.getByTestId('archive-graph').evaluate((element) => ({
+    x: element.getAttribute('data-view-x'),
+    y: element.getAttribute('data-view-y'),
+  }));
+  await page.mouse.move(scrolledCanvasBox!.x + scrolledCanvasBox!.width * 0.5, scrolledCanvasBox!.y + scrolledCanvasBox!.height * 0.5);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(scrolledCanvasBox!.x + scrolledCanvasBox!.width * 0.58, scrolledCanvasBox!.y + scrolledCanvasBox!.height * 0.56);
+  await page.mouse.up({ button: 'middle' });
+  await expect.poll(async () => page.getByTestId('archive-graph').evaluate((element) => ({
+    x: element.getAttribute('data-view-x'),
+    y: element.getAttribute('data-view-y'),
+  }))).not.toEqual(viewBeforeMiddlePan);
+  await expect.poll(async () => contentScrollTop(page)).toBe(scrollBeforeWheel);
+  await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.47, canvasBox!.y + canvasBox!.height * 0.74);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.52, canvasBox!.y + canvasBox!.height * 0.70);
+  await page.mouse.up();
+  await clickVisibleGraphNode(page);
+  await expect(page.getByTestId('archive-graph-detail')).toBeVisible();
+  await page.getByTestId('archive-graph-canvas').click({ position: { x: 4, y: 4 } });
+  await expect(page.getByTestId('archive-graph-detail')).toHaveCount(0);
+  await page.getByLabel('Zoom in graph').click();
+  await page.getByLabel('Zoom out graph').click();
+  await page.getByLabel('Fit graph').click();
+  await page.getByLabel('Reset graph').click();
+
+  await page.getByLabel('Collapse graph controls').click();
+  await expect(page.getByText('Forces')).not.toBeVisible();
+  await page.getByLabel('Open graph controls').click();
+  await expect(page.getByText('Forces')).toBeVisible();
+});
+
+test('archive graph uses theme accent tokens when rendering canvas highlights', async ({ page }) => {
+  await page.getByTitle('Archive').click();
+  await expect(page.getByTestId('archive-graph-canvas')).toBeVisible();
+  await expect.poll(async () => Number(await page.getByTestId('archive-graph').getAttribute('data-node-count'))).toBeGreaterThan(0);
+  await expect.poll(async () => (await canvasPixelStats(page)).painted).toBeGreaterThan(1000);
+
+  await clickVisibleGraphNode(page);
+  await expect(page.getByTestId('archive-graph-detail')).toBeVisible();
+
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('.relay-shell')?.style.setProperty('--color-active', 'rgb(255, 0, 0)');
+  });
+  await page.waitForTimeout(80);
+  const redAccent = await canvasPixelStats(page);
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('.relay-shell')?.style.setProperty('--color-active', 'rgb(0, 0, 255)');
+  });
+  await page.waitForTimeout(80);
+  const blueAccent = await canvasPixelStats(page);
+
+  expect(redAccent.red).toBeGreaterThan(blueAccent.red);
+  expect(blueAccent.blue).toBeGreaterThan(redAccent.blue);
+});
+
+test('archive graph distributes node colors from theme tokens', async ({ page }) => {
+  await page.getByTitle('Archive').click();
+  await expect(page.getByTestId('archive-graph-canvas')).toBeVisible();
+  await expect.poll(async () => (await canvasPixelStats(page)).painted).toBeGreaterThan(1000);
+
+  await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('.relay-shell');
+    shell?.style.setProperty('--color-active', 'rgb(0, 0, 0)');
+    shell?.style.setProperty('--color-success', 'rgb(0, 0, 0)');
+    shell?.style.setProperty('--color-pending', 'rgb(0, 0, 0)');
+    shell?.style.setProperty('--color-special', 'rgb(0, 0, 0)');
+    shell?.style.setProperty('--color-danger', 'rgb(0, 0, 0)');
+    shell?.style.setProperty('--ink-2', 'rgb(0, 0, 0)');
+  });
+  await page.waitForTimeout(80);
+  const darkNodes = await canvasPixelStats(page);
+
+  await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('.relay-shell');
+    shell?.style.setProperty('--color-active', 'rgb(255, 255, 255)');
+    shell?.style.setProperty('--color-success', 'rgb(255, 255, 255)');
+    shell?.style.setProperty('--color-pending', 'rgb(255, 255, 255)');
+    shell?.style.setProperty('--color-special', 'rgb(255, 255, 255)');
+    shell?.style.setProperty('--color-danger', 'rgb(255, 255, 255)');
+    shell?.style.setProperty('--ink-2', 'rgb(255, 255, 255)');
+  });
+  await page.waitForTimeout(80);
+  const lightNodes = await canvasPixelStats(page);
+
+  expect(lightNodes.red + lightNodes.green + lightNodes.blue).toBeGreaterThan(darkNodes.red + darkNodes.green + darkNodes.blue);
+
+  const studioDotColor = await page.locator('.graph-legend span', { hasText: 'Studios' }).evaluate((element) => getComputedStyle(element, '::before').backgroundColor);
+  expect(studioDotColor).toBe('rgb(255, 255, 255)');
+  await page.getByTestId('archive-filter-panel').getByLabel('Studios').uncheck();
+  await expect(page.locator('.graph-legend span', { hasText: 'Studios' })).toHaveAttribute('data-muted', 'true');
 });
 
 test('calendar starts collapsed and expands person rows on demand', async ({ page }) => {
@@ -686,27 +1229,144 @@ test('calendar uses proportional summary fills without numeric hour totals', asy
 
   const summaryStyles = await page.getByTestId('calendar-cell-person-manager-2026-05-04').evaluate((element) => {
     const cellStyles = getComputedStyle(element);
-    const utilization = element.querySelector('.utilization-stack')!;
+    const band = element.querySelector('.allocation-band')!;
     return {
       borderRight: cellStyles.borderRightColor,
       text: element.textContent?.trim(),
-      utilizationWidth: getComputedStyle(utilization).width,
+      bandWidth: getComputedStyle(band).width,
     };
   });
-  expect(summaryStyles.text).toBe('');
-  expect(Number.parseFloat(summaryStyles.utilizationWidth)).toBeGreaterThan(20);
+  expect(summaryStyles.text).toBe('4h');
+  expect(Number.parseFloat(summaryStyles.bandWidth)).toBeGreaterThan(20);
   const timelineOverflow = await page.getByTestId('calendar-timeline').evaluate((element) => ({
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
   }));
-  expect(timelineOverflow.scrollWidth).toBeLessThanOrEqual(timelineOverflow.clientWidth + 1);
+  expect(timelineOverflow.scrollWidth).toBeGreaterThan(timelineOverflow.clientWidth);
+  await page.getByRole('button', { name: 'month' }).click();
+  const header = page.getByTestId('calendar-date-header-2026-05-04');
+  const headerBox = await header.boundingBox();
+  expect(headerBox).not.toBeNull();
+  await page.mouse.move(headerBox!.x + headerBox!.width / 2, headerBox!.y + headerBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(headerBox!.x - 180, headerBox!.y + headerBox!.height / 2);
+  await page.mouse.up();
+  await expect
+    .poll(() => page.getByTestId('calendar-timeline').evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
 
   await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
   await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByLabel('Start time 1').fill('18:00');
   await page.getByLabel('Duration 1').fill('4');
   await page.getByRole('button', { name: 'Apply allocation' }).click();
 
-  await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-05').locator('.utilization-segment')).toHaveCount(2);
+  await expect(page.getByTestId('calendar-summary-bands-person-manager-2026-05-05').locator('.allocation-band')).toHaveCount(2);
+});
+
+test('calendar timeline pans through hidden horizontal scrollbar and tracks centered date', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await expect(page.getByTestId('calendar-timeline')).toBeVisible();
+
+  const weekWidth = await page.getByTestId('calendar-date-header-2026-05-05').evaluate((element) => element.getBoundingClientRect().width);
+  await page.getByRole('button', { name: 'month' }).click();
+  const monthWidth = await page.getByTestId('calendar-date-header-2026-05-05').evaluate((element) => element.getBoundingClientRect().width);
+  expect(Math.round(monthWidth)).toBe(Math.round(weekWidth / 4));
+
+  const timelineMetrics = await page.getByTestId('calendar-timeline').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    horizontalChrome: element.offsetHeight - element.clientHeight,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(timelineMetrics.scrollWidth).toBeGreaterThan(timelineMetrics.clientWidth);
+  expect(timelineMetrics.horizontalChrome).toBeLessThanOrEqual(2);
+
+  const header = page.getByTestId('calendar-date-header-2026-05-05');
+  const headerBox = await header.boundingBox();
+  expect(headerBox).not.toBeNull();
+  await page.waitForTimeout(100);
+  await page.mouse.move(headerBox!.x + headerBox!.width / 2, headerBox!.y + headerBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(headerBox!.x - 900, headerBox!.y + headerBox!.height / 2);
+  await page.mouse.up();
+  await expect.poll(() => page.getByLabel('Selected date').inputValue()).not.toBe('2026-05-05');
+  await expect.poll(() => page.getByTestId('calendar-timeline').evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+});
+
+test('calendar places toolbar and editor in the right column while legend stays under the timeline', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector<HTMLElement>('[data-testid="calendar-main-column"]')!;
+    const side = document.querySelector<HTMLElement>('[data-testid="calendar-side-column"]')!;
+    const timeline = document.querySelector<HTMLElement>('[data-testid="calendar-timeline"]')!;
+    const legend = document.querySelector<HTMLElement>('[data-testid="calendar-legend"]')!;
+    const toolbar = document.querySelector<HTMLElement>('.calendar-toolbar')!;
+    const editor = document.querySelector<HTMLElement>('[aria-label="Allocation editor"]')!;
+    const timelineBox = timeline.getBoundingClientRect();
+    const legendBox = legend.getBoundingClientRect();
+    const toolbarBox = toolbar.getBoundingClientRect();
+    const editorBox = editor.getBoundingClientRect();
+    return {
+      editorBelowToolbar: editorBox.top >= toolbarBox.bottom,
+      legendAfterTimeline: legendBox.top >= timelineBox.bottom,
+      legendInMain: legend.parentElement === main,
+      legendWidth: Math.round(legendBox.width),
+      sideContainsEditor: editor.parentElement === side,
+      sideContainsToolbar: toolbar.parentElement === side,
+      timelineWidth: Math.round(timelineBox.width),
+    };
+  });
+
+  expect(layout.sideContainsToolbar).toBe(true);
+  expect(layout.sideContainsEditor).toBe(true);
+  expect(layout.editorBelowToolbar).toBe(true);
+  expect(layout.legendInMain).toBe(true);
+  expect(layout.legendAfterTimeline).toBe(true);
+  expect(Math.abs(layout.legendWidth - layout.timelineWidth)).toBeLessThanOrEqual(1);
+});
+
+test('year view renders read-only monthly project statistics without holiday or overbooking marks', async ({ page }) => {
+  await openCalendar(page, 'Allocation');
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
+  await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByLabel('Start time 1').fill('18:00');
+  await page.getByLabel('Duration 1').fill('4');
+  await page.getByRole('button', { name: 'Apply allocation' }).click();
+
+  await page.getByRole('button', { name: 'year' }).click();
+  const yearCell = page.getByTestId('calendar-cell-person-manager-2026-05-01');
+  await expect(yearCell.locator('.year-project-stat')).toHaveCount(3);
+  await expect(yearCell).not.toContainText('9h');
+  await expect(yearCell).not.toHaveClass(/is-over/);
+  await expect(page.getByTestId(/uk-holiday-overlay-/)).toHaveCount(0);
+
+  const statStyles = await yearCell.evaluate((element) => {
+    const stats = [...element.querySelectorAll<HTMLElement>('.year-project-stat')];
+    return {
+      firstWidth: getComputedStyle(stats[0]).getPropertyValue('--stat-width').trim(),
+      secondWidth: getComputedStyle(stats[1]).getPropertyValue('--stat-width').trim(),
+      overbookWidth: getComputedStyle(stats[1]).getPropertyValue('--overbook-width').trim(),
+      statBackground: getComputedStyle(stats[1]).backgroundImage,
+    };
+  });
+  expect(statStyles.firstWidth).toBe('100%');
+  expect(Number.parseFloat(statStyles.secondWidth)).toBeGreaterThan(0);
+  expect(statStyles.overbookWidth).toBe('');
+  expect(statStyles.statBackground).not.toContain('239, 68, 68');
+
+  await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
+  const projectYearCell = page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-01');
+  await expect(projectYearCell.locator('.year-project-stat')).toContainText('4h');
+  await expect(projectYearCell).not.toHaveClass(/is-over/);
+
+  await yearCell.click();
+  await expect(page.getByTestId('allocation-editor-mode')).toHaveText('Create mode');
+  await expect(page.getByRole('button', { name: 'Apply allocation' })).toBeDisabled();
+  await expect(page.getByLabel('Project').last()).toBeDisabled();
 });
 
 test('allocation layers neutral past, red overbooking, and time off overlays without changing totals', async ({ page }) => {
@@ -733,6 +1393,8 @@ test('allocation layers neutral past, red overbooking, and time off overlays wit
   await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).not.toHaveClass(/is-over/);
 
   await page.getByTestId('calendar-cell-person-manager-2026-05-05').click();
+  await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
+  await page.getByLabel('Start time 1').fill('18:00');
   await page.getByLabel('Duration 1').fill('4');
   await page.getByRole('button', { name: 'Apply allocation' }).click();
   await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).toHaveAttribute('aria-label', /9h allocated/);
@@ -747,9 +1409,10 @@ test('allocation layers neutral past, red overbooking, and time off overlays wit
     const holiday = getComputedStyle(element.querySelector('.booking-holiday')!, '::before').backgroundImage;
     const sickLeave = getComputedStyle(element.querySelector('.booking-sick-leave')!, '::before').backgroundImage;
     const selection = getComputedStyle(element, '::before');
-    const utilizationZ = getComputedStyle(element.querySelector('.utilization-stack')!).zIndex;
+    const summaryZ = getComputedStyle(element.querySelector('.allocation-segment-layer')!).zIndex;
+    const bandZ = getComputedStyle(element.querySelector('.allocation-band')!).zIndex;
     const timeOffZ = getComputedStyle(element.querySelector('.time-off-overlay')!).zIndex;
-    return { holiday, over, overZ, selectionBackground: selection.backgroundColor, selectionPattern: selection.backgroundImage, sickLeave, timeOffZ, utilizationZ };
+    return { bandZ, holiday, over, overZ, selectionBackground: selection.backgroundColor, selectionPattern: selection.backgroundImage, sickLeave, summaryZ, timeOffZ };
   });
   expect(styles.over).toContain('-45deg');
   expect(styles.holiday).toContain('repeating-linear-gradient');
@@ -758,9 +1421,10 @@ test('allocation layers neutral past, red overbooking, and time off overlays wit
   expect(styles.sickLeave).toContain('-45deg');
   expect(styles.selectionPattern).toBe('none');
   expect(styles.selectionBackground).not.toBe('rgba(0, 0, 0, 0)');
-  expect(Number(styles.utilizationZ)).toBeGreaterThanOrEqual(1);
-  expect(Number(styles.overZ)).toBeLessThan(Number(styles.utilizationZ));
-  expect(Number(styles.timeOffZ)).toBeGreaterThan(Number(styles.utilizationZ));
+  expect(Number(styles.summaryZ)).toBeGreaterThanOrEqual(1);
+  expect(Number(styles.overZ)).toBeLessThan(Number(styles.summaryZ));
+  expect(Number(styles.timeOffZ)).toBeLessThan(Number(styles.summaryZ));
+  expect(Number(styles.timeOffZ)).toBeLessThan(Number(styles.bandZ));
 
   await page.getByTestId('calendar-cell-person-manager-2026-05-05').hover();
   const hoverStyles = await page.getByTestId('calendar-cell-person-manager-2026-05-05').evaluate((element) => {
@@ -777,6 +1441,21 @@ test('allocation layers neutral past, red overbooking, and time off overlays wit
     return getComputedStyle(grid, '::before').backgroundImage;
   });
   expect(gridStripeBackground).toContain('-45deg');
+
+  await page.getByRole('button', { name: 'day' }).click();
+  await page.getByLabel('Selected date').fill('2026-05-05');
+  const dayLayering = await page.getByTestId('day-row-person-manager-2026-05-05').evaluate((element) => {
+    const block = element.querySelector<HTMLElement>('.allocation-block')!;
+    const timeOff = element.querySelector<HTMLElement>('.time-off-overlay')!;
+    const holiday = element.querySelector<HTMLElement>('.uk-holiday')!;
+    return {
+      blockZ: getComputedStyle(block).zIndex,
+      holidayZ: getComputedStyle(holiday).zIndex,
+      timeOffZ: getComputedStyle(timeOff).zIndex,
+    };
+  });
+  expect(Number(dayLayering.blockZ)).toBeGreaterThan(Number(dayLayering.timeOffZ));
+  expect(Number(dayLayering.blockZ)).toBeGreaterThan(Number(dayLayering.holidayZ));
 });
 
 test('calendar keeps person date selection, adds timed segments per project, and attaches tasks', async ({ page }) => {
@@ -789,17 +1468,23 @@ test('calendar keeps person date selection, adds timed segments per project, and
   await page.getByTestId('calendar-cell-person-manager-2026-05-04').click();
   await page.getByTestId('calendar-cell-person-manager-2026-05-06').click({ modifiers: ['Shift'] });
   await expect(page.getByTestId('selection-count')).toHaveCount(0);
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-04')).toHaveClass(/is-range-start/);
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-05')).toHaveClass(/is-range-middle/);
+  await expect(page.getByTestId('calendar-cell-person-manager-2026-05-06')).toHaveClass(/is-range-end/);
 
   await page.getByTestId('calendar-cell-person-artist-a-2026-05-05').click({ modifiers: ['Control'] });
   await expect(page.getByTestId('selection-count')).toHaveCount(0);
+  await expect(page.getByTestId('calendar-cell-person-artist-a-2026-05-05')).toHaveClass(/is-range-start/);
+  await expect(page.getByTestId('calendar-cell-person-artist-a-2026-05-05')).toHaveClass(/is-range-end/);
 
   await page.getByLabel('Project').last().selectOption('bexsero-retouch-project');
   await page.getByLabel('Start time 1').fill('09:00');
   await page.getByLabel('Duration 1').fill('5');
   await page.getByLabel('Status').last().selectOption('active');
   await page.getByRole('textbox', { name: 'Notes' }).fill('bulk allocation smoke test');
+  await page.getByRole('button', { name: 'Select deliverables' }).click();
   await page.getByLabel('Photoshop retouch working files').check();
-  await expect(page.getByTestId('attached-task-count')).toHaveText('1 attached');
+  await expect(page.getByTestId('attached-task-count')).toHaveText('1 deliverable attached');
   await page.getByRole('button', { name: 'Apply allocation' }).click();
 
   await expect(page.getByTestId('calendar-cell-person-manager-2026-05-04')).toHaveAttribute('aria-label', /9h allocated/);
@@ -812,7 +1497,7 @@ test('calendar keeps person date selection, adds timed segments per project, and
   await expect(page.getByTestId('calendar-cell-person-manager-2026-05-04')).toHaveClass(/is-over/);
   await expect(page.getByTestId('calendar-task-due-task-bexsero-retouch')).toHaveText('2026-05-06');
 
-  await page.getByRole('button', { name: /Tasks/ }).click();
+  await page.getByRole('button', { name: /Deliverables/ }).click();
   await expect(page.getByTestId('task-row-task-bexsero-retouch')).toContainText('2026-05-06');
 });
 
@@ -830,7 +1515,7 @@ test('selected cells can append multiple timed segments to week cells', async ({
   await page.getByRole('button', { name: 'Apply allocation' }).click();
   await page.getByRole('button', { name: 'Expand Ben Hall' }).click();
   await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').locator('.allocation-band')).toHaveText(['1.5h', '1.25h']);
-  await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-06').locator('.utilization-segment')).toHaveCount(2);
+  await expect(page.getByTestId('calendar-summary-bands-person-manager-2026-05-06').locator('.allocation-band')).toHaveCount(2);
 });
 
 test('selecting an allocated project cell loads all segments and replaces that cell', async ({ page }) => {
@@ -851,7 +1536,7 @@ test('selecting an allocated project cell loads all segments and replaces that c
   await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').locator('.allocation-band')).toHaveText(['1.5h', '1.25h']);
 
   await page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06').click();
-  await expect(page.getByTestId('allocation-editor-mode')).toHaveCount(0);
+  await expect(page.getByTestId('allocation-editor-mode')).toHaveText('Replace cell mode');
   await expect(page.getByTestId('segment-editor-row-0')).toBeVisible();
   await expect(page.getByTestId('segment-editor-row-1')).toBeVisible();
   await page.getByTestId('segment-editor-row-1').getByRole('button', { name: 'Delete' }).click();
@@ -859,33 +1544,50 @@ test('selecting an allocated project cell loads all segments and replaces that c
   await page.getByRole('button', { name: 'Replace allocation' }).click();
 
   await expect(page.getByTestId('calendar-project-cell-person-manager-bexsero-retouch-project-2026-05-06')).toContainText('1h');
-  await expect(page.getByTestId('calendar-utilization-person-manager-2026-05-06').locator('.utilization-segment')).toHaveCount(1);
+  await expect(page.getByTestId('calendar-summary-bands-person-manager-2026-05-06').locator('.allocation-band')).toHaveCount(1);
 });
 
-test('day view supports snapped block creation, timezone marker, context delete, and pane sync', async ({ page }) => {
+test('day view supports snapped block creation, selected date marker, context delete, and pane sync', async ({ page }) => {
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByLabel('Timezone').fill('UTC');
   await openCalendar(page, 'Allocation');
   await page.getByRole('button', { name: 'day' }).click();
-  await page.getByLabel('Selected date').fill('2026-05-13');
-  await expect(page.getByTestId('current-time-marker').first()).toBeVisible();
   await page.getByLabel('Selected date').fill('2026-05-14');
+  await expect(page.getByTestId('current-time-marker')).toHaveCount(0);
+  await expect(page.getByTestId('selected-date-overlay-2026-05-14').first()).toBeVisible();
+  await page.getByLabel('Selected date').fill('2026-05-15');
 
-  const row = page.getByTestId('day-row-person-manager-2026-05-14');
-  const box = await row.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + 1, box!.y + 20);
+  const row = page.getByTestId('day-row-person-manager-2026-05-15');
+  const dragBox = await row.evaluate((element) => {
+    const rowBox = element.getBoundingClientRect();
+    const timeline = element.closest('.calendar-timeline') as HTMLElement;
+    const timelineBox = timeline.getBoundingClientRect();
+    const labelWidth = timeline.querySelector<HTMLElement>('.calendar-corner')?.getBoundingClientRect().width ?? 0;
+    const contentWidth = timeline.clientWidth - labelWidth;
+    return {
+      endX: timelineBox.left + labelWidth + 1 + contentWidth * 0.125,
+      startX: timelineBox.left + labelWidth + 1,
+      y: rowBox.top + 20,
+    };
+  });
+  await page.mouse.move(dragBox.startX, dragBox.y);
   await page.mouse.down();
-  await page.mouse.move(box!.x + box!.width * 0.125, box!.y + 20);
+  await page.mouse.move(dragBox.endX, dragBox.y);
   await page.mouse.up();
 
   const block = page.locator('[data-testid^="allocation-block-alloc-local-"]').last();
   await expect(block).toBeVisible();
-  await expect(page.getByLabel('Start time 1')).toHaveValue('09:00');
-  await expect(page.getByLabel('End time 1')).toHaveValue('10:30');
+  await expect(page.getByLabel('Start time 1')).toHaveValue('09:15');
+  await expect(page.getByLabel('End time 1')).toHaveValue('10:15');
+  await block.click();
+  await expect(page.getByTestId('allocation-editor-mode')).toHaveText('Edit selected segment mode');
+  await page.getByLabel('End time 1').fill('13:30');
+  await page.getByRole('button', { name: 'Update selected segments' }).click();
+  await expect(block).toContainText('09:15-13:30');
 
   await block.click({ button: 'right' });
   await expect(page.getByTestId('allocation-context-menu')).toBeVisible();
   await page.getByTestId('allocation-context-menu').getByRole('button', { name: 'Delete' }).click();
   await expect(block).not.toBeVisible();
 });
+

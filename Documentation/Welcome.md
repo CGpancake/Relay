@@ -1,25 +1,21 @@
-# Welcome to Relay
+# Welcome
 
-Relay is a frontend prototype for production task coordination. It is designed for teams that need to track projects, tasks, review notes, allocations, archived work, people, permissions, and themes in one focused workspace.
+Relay is a frontend prototype for production deliverable coordination. It brings projects, deliverables, review notes, allocation planning, archived work, people, permissions, and themes into one local workspace.
 
-The current app is intentionally local and deterministic. It uses seeded data and resets task, project, allocation, archive, and notification state on every page load. Theme choice and the current prototype user are stored in the browser so permissions and visual settings can be tested across reloads.
+The current app is intentionally deterministic. Project, deliverable, allocation, archive, and notification state resets on page load. Theme choice, current prototype user, planning timezone, calendar overlay defaults, and Day-view padding persist in browser local storage so access and visual settings can be tested across reloads.
 
 ## Start here
 
-- [[Core Workflow/Navigation|Navigation]] explains the main app areas.
-- [[Projects and Tasks/Task Board|Task Board]] explains the task workflow.
-- [[Projects and Tasks/Projects|Projects]] explains project and task creation.
-- [[Allocation Planning/Allocation Calendar|Allocation Calendar]] explains the producer planning view.
-- [[People Permissions and Settings/Permissions|Permissions]] explains who can access what.
-- [[Reference/Prototype Limits|Prototype Limits]] lists what is not implemented yet.
+- [[Core Workflow/Navigation|Navigation]] explains the app shell, routes, sidebar, and notification bell.
+- [[Projects and Deliverables/Deliverables Board|Deliverables Board]] explains the grouped deliverable workflow and review panes.
+- [[Projects and Deliverables/Projects|Projects]] explains project metadata and deliverable creation.
+- [[Allocation Planning/Allocation Calendar|Allocation Calendar]] explains allocation, time off, milestones, and transient deliverable attachments.
+- [[Projects and Deliverables/Archive and Restore|Archive and Restore]] explains restoreable archive behavior and the relationship graph.
 
-## What Relay validates today
+## Current scope
 
-- A task workflow centered on grouped work, filters, review panes, subtasks, comments, followers, and notifications.
-- Project setup with editable tags, tools, and project-specific task creation.
-- Allocation planning across day, week, month, and year views.
-- Restoreable archive behavior for projects, tasks, subtasks, and allocations.
-- Frontend-only permission gates for Admin, Manager, Artist, and Client users.
-- A brutalist design system with concrete themes and community theme choices.
-
-Relay is not connected to a backend yet. Treat this version as a working product slice for shaping behavior before production architecture is locked.
+- A deliverable workflow with filters, grouped rows, multi-pane review, annotations, A/B preview, zoom, comments, followers, notifications, and subdeliverables.
+- Project setup with studios, tags, tools, editable metadata, archive confirmation, and project-specific deliverable creation.
+- Calendar planning with Allocation, Time Off, and Milestones modes.
+- Restoreable archive behavior for projects, deliverables, subdeliverables, and allocations, plus an interactive relationship graph.
+- People and Settings screens for local permission testing, theme switching, accent choices, and timezone preferences.

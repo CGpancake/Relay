@@ -22,7 +22,7 @@ export function AppShell() {
   const ActiveComponent = activeViewModule.Component;
 
   React.useEffect(() => {
-    const nextPath = activeView === 'calendar' ? calendarPathFromCurrentUrl() : `/${activeView}`;
+    const nextPath = activeView === 'calendar' ? calendarPathFromCurrentUrl() : activeView === 'tasks' ? '/deliverables' : `/${activeView}`;
     if (`${window.location.pathname}${window.location.search}` !== nextPath) {
       window.history.replaceState(null, '', nextPath);
     }
@@ -60,9 +60,9 @@ export function AppShell() {
             {unreadNotifications > 0 && <span>{unreadNotifications}</span>}
           </button>
           {notificationsOpen && (
-            <section className="notification-panel" aria-label="Task notifications">
+            <section className="notification-panel" aria-label="Deliverable notifications">
               {state.notifications.length === 0 ? (
-                <p>No task updates</p>
+                <p>No deliverable updates</p>
               ) : (
                 state.notifications.map((notification) => (
                   <article key={notification.id}>

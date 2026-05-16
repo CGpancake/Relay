@@ -1,11 +1,13 @@
 import React from 'react';
-import type { Allocation, AllocationSelectionCell, AllocationStatus, AllocationView, Booking, Project } from '../../types';
+import { addDays, formatDate } from '../../lib/date';
+import { englandAndWalesBankHolidays, type UkBankHoliday } from '../../data/ukBankHolidays';
+import type { Allocation, AllocationSelectionCell, AllocationStatus, AllocationView, Booking, Project, TimeOffEntry } from '../../types';
 import { blockStyle, clampMinute as clampCalendarMinute, dateMatchesView } from '../../shared/calendar';
 
 export const CAPACITY_MINUTES = 8 * 60;
 export const SNAP_MINUTES = 15;
 export const DAY_MINUTES = 24 * 60;
-export const DEFAULT_SEGMENT = { startMinute: 9 * 60, endMinute: 13 * 60 };
+export const DEFAULT_SEGMENT = { startMinute: 10 * 60, endMinute: 18 * 60 };
 
 export type SegmentDraft = {
   id: string;
@@ -21,6 +23,9 @@ export type AllocationDragState =
   | { kind: 'create'; personId: string; projectId: string; date: string; startMinute: number; endMinute: number }
   | { kind: 'move'; allocationId: string; originMinute: number; originalDate: string; originalStart: number; originalEnd: number }
   | { kind: 'resize-start' | 'resize-end'; allocationId: string; originalDate: string; originalStart: number; originalEnd: number };
+
+export type DayHourTick = { minute: number; label: string };
+export type DayOverbookSegment = { id: string; date: string; startMinute: number; endMinute: number };
 
 export function sameCell(a: AllocationSelectionCell, b: AllocationSelectionCell) {
   return (
@@ -38,6 +43,13 @@ export function allocationsFor(allocations: Allocation[], personId: string, date
 
 export function bookingsFor(bookings: Booking[], personId: string, date: string, view: AllocationView) {
   return bookings.filter((b) => b.personId === personId && dateMatchesView(b.date, date, view));
+}
+
+export function ukBankHolidaysForDate(date: string, view: AllocationView): UkBankHoliday[] {
+  if (view === 'year') {
+    return englandAndWalesBankHolidays.filter((holiday) => holiday.date.startsWith(date.slice(0, 7)));
+  }
+  return englandAndWalesBankHolidays.filter((holiday) => holiday.date === date);
 }
 
 export function durationMinutes(allocation: Allocation) {
@@ -58,6 +70,17 @@ export function timeLabel(minutes: number) {
   const hours = Math.floor(clamped / 60);
   const mins = clamped % 60;
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
+export function dayHourTicks(startMinute: number, endMinute: number): DayHourTick[] {
+  const firstHour = Math.ceil(startMinute / 60);
+  const lastHour = Math.floor(endMinute / 60);
+  return Array.from({ length: Math.max(0, lastHour - firstHour + 1) }, (_, index) => {
+    const minute = (firstHour + index) * 60;
+    const minuteOfDay = ((minute % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+    const labelMinute = minute !== startMinute && minuteOfDay === 0 ? DAY_MINUTES : minuteOfDay;
+    return { minute, label: timeLabel(labelMinute) };
+  });
 }
 
 export function minuteFromTime(value: string) {
@@ -131,6 +154,122 @@ export function compactAllocationSegmentStyle(allocation: Allocation, dayAllocat
   } as React.CSSProperties;
 }
 
+export function dayOverbookSegments(allocations: Allocation[], personId: string, date: string): DayOverbookSegment[] {
+  let used = 0;
+  return allocations
+    .filter((allocation) => allocation.personId === personId && allocation.date === date)
+    .sort((a, b) => a.startMinute - b.startMinute || a.id.localeCompare(b.id))
+    .flatMap((allocation) => {
+      const startUsed = used;
+      const endUsed = used + durationMinutes(allocation);
+      used = endUsed;
+      const extra = Math.max(0, endUsed - CAPACITY_MINUTES) - Math.max(0, startUsed - CAPACITY_MINUTES);
+      if (extra <= 0) return [];
+      return [{
+        id: allocation.id,
+        date: allocation.date,
+        startMinute: Math.max(allocation.startMinute, allocation.endMinute - extra),
+        endMinute: allocation.endMinute,
+      }];
+    });
+}
+
+export function connectedTimeOffEntries(entries: TimeOffEntry[], target: TimeOffEntry): TimeOffEntry[] {
+  const related = entries.filter(
+    (entry) =>
+      entry.personId === target.personId &&
+      entry.type === target.type &&
+      entry.status === target.status &&
+      (isFullDay(entry) ? isFullDay(target) : !isFullDay(target) && entry.date === target.date),
+  );
+  const connectedIds = new Set([target.id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    related.forEach((entry) => {
+      if (connectedIds.has(entry.id)) return;
+      const connects = related.some((candidate) => connectedIds.has(candidate.id) && timeOffEntriesTouch(candidate, entry));
+      if (connects) {
+        connectedIds.add(entry.id);
+        changed = true;
+      }
+    });
+  }
+  return related
+    .filter((entry) => connectedIds.has(entry.id))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startMinute - b.startMinute || a.id.localeCompare(b.id));
+}
+
+export type YearProjectStat = {
+  projectId: string;
+  totalMinutes: number;
+  overbookedMinutes: number;
+  relativeWidth: number;
+};
+
+export function monthlyProjectStats(allocations: Allocation[], personId: string, monthDate: string): YearProjectStat[] {
+  const monthKey = monthDate.slice(0, 7);
+  const monthAllocations = allocations.filter((allocation) => allocation.personId === personId && allocation.date.startsWith(monthKey));
+  const totals = new Map<string, number>();
+  monthAllocations.forEach((allocation) => {
+    totals.set(allocation.projectId, (totals.get(allocation.projectId) ?? 0) + durationMinutes(allocation));
+  });
+  const overbooked = monthlyOverbookedMinutesByProject(monthAllocations);
+  const longest = Math.max(...totals.values(), 0);
+  return [...totals.entries()]
+    .map(([projectId, totalMinutes]) => ({
+      projectId,
+      totalMinutes,
+      overbookedMinutes: overbooked.get(projectId) ?? 0,
+      relativeWidth: longest > 0 ? totalMinutes / longest : 0,
+    }))
+    .sort((a, b) => b.totalMinutes - a.totalMinutes || a.projectId.localeCompare(b.projectId));
+}
+
+export function monthlyOverbookedMinutesByProject(allocations: Allocation[]) {
+  const byDate = new Map<string, Allocation[]>();
+  allocations.forEach((allocation) => {
+    byDate.set(allocation.date, [...(byDate.get(allocation.date) ?? []), allocation]);
+  });
+  const overbooked = new Map<string, number>();
+  byDate.forEach((dayAllocations) => {
+    let used = 0;
+    [...dayAllocations]
+      .sort((a, b) => a.startMinute - b.startMinute || a.id.localeCompare(b.id))
+      .forEach((allocation) => {
+        const start = used;
+        const end = used + durationMinutes(allocation);
+        const extra = Math.max(0, end - CAPACITY_MINUTES) - Math.max(0, start - CAPACITY_MINUTES);
+        if (extra > 0) overbooked.set(allocation.projectId, (overbooked.get(allocation.projectId) ?? 0) + extra);
+        used = end;
+      });
+  });
+  return overbooked;
+}
+
+export function mergeAdjacentAllocations(allocations: Allocation[]) {
+  const groups = new Map<string, Allocation[]>();
+  allocations.forEach((allocation) => {
+    const key = [allocation.personId, allocation.date, allocation.projectId].join('|');
+    groups.set(key, [...(groups.get(key) ?? []), allocation]);
+  });
+
+  return [...groups.values()]
+    .flatMap((group) => {
+      const sorted = [...group].sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute || a.id.localeCompare(b.id));
+      return sorted.reduce<Allocation[]>((merged, allocation) => {
+        const previous = merged.at(-1);
+        if (previous && allocation.startMinute <= previous.endMinute) {
+          previous.endMinute = Math.max(previous.endMinute, allocation.endMinute);
+          return merged;
+        }
+        merged.push({ ...allocation });
+        return merged;
+      }, []);
+    })
+    .sort((a, b) => a.personId.localeCompare(b.personId) || a.date.localeCompare(b.date) || a.startMinute - b.startMinute || a.id.localeCompare(b.id));
+}
+
 const projectColorPalette = ['#E6B450', '#6CB6FF', '#7FD88F', '#F37C9B', '#B493FF', '#4CC7C7', '#F59E5C', '#8BD450'];
 
 export function colorForProject(projectId: string, projects: Project[]) {
@@ -146,3 +285,15 @@ export function projectColorsFor(projectIds: string[]) {
 }
 
 export { blockStyle, dateMatchesView };
+
+function isFullDay(entry: TimeOffEntry) {
+  return entry.startMinute === 0 && entry.endMinute === DAY_MINUTES;
+}
+
+function timeOffEntriesTouch(a: TimeOffEntry, b: TimeOffEntry) {
+  if (isFullDay(a) && isFullDay(b)) {
+    const aDate = new Date(`${a.date}T00:00:00`);
+    return formatDate(addDays(aDate, 1)) === b.date || formatDate(addDays(aDate, -1)) === b.date;
+  }
+  return a.date === b.date && (a.endMinute === b.startMinute || b.endMinute === a.startMinute);
+}

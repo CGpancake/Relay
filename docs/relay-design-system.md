@@ -1,5 +1,5 @@
 # Relay — Design System
-*Production pipeline task and asset management. CG · AI · Print.*
+*Production pipeline deliverable and asset management. CG · AI · Print.*
 
 ---
 
@@ -96,7 +96,7 @@ The primary signal colour. Caution-tape yellow. Used for anything currently in m
 
 **Applies to:**
 - Active nav item left border
-- Task row left border (wip status)
+- Deliverable row left border (wip status)
 - Filter chip underline (active)
 - Version badge background (current version)
 - Progress bar fill (31–65% completion)
@@ -117,7 +117,7 @@ Blocked, failed, critical. Warmer than alarm red — it sits in the same materia
 **Catppuccin Mocha:** `#f38ba8` red — Relay's is more saturated and less pink
 
 **Applies to:**
-- Task row left border (blocked status)
+- Deliverable row left border (blocked status)
 - Status label text (dark/dim themes)
 - Server dot (offline/error)
 - Progress bar fill (0–30% completion)
@@ -138,7 +138,7 @@ Done, approved, healthy, resolved. HSL 150° sits exactly between warm and cold 
 **Catppuccin Mocha:** `#a6e3a1` green — Relay's is significantly more saturated
 
 **Applies to:**
-- Task row left border (done status)
+- Deliverable row left border (done status)
 - Completed checkbox fill
 - Server dot (online)
 - Progress bar fill (66–100% completion)
@@ -160,7 +160,7 @@ Review, queued, pending, informational. The most muted accent in the palette. HS
 **Catppuccin Mocha:** `#89b4fa` blue — Relay's is significantly more muted
 
 **Applies to:**
-- Task row left border (review, queued, todo status)
+- Deliverable row left border (review, queued, todo status)
 - Status label text
 - Server dot (connecting)
 - Annotation/comment thread line
@@ -185,7 +185,7 @@ The hue shift is enough to read as categorically distinct from steel at 3px bar 
 **Catppuccin Mocha:** `#cba6f7` mauve shifted blue — closest in spirit
 
 **Applies to:**
-- Task row left border (ai-gen, lookdev)
+- Deliverable row left border (ai-gen, lookdev)
 - Asset card left border (ai-generated, in-lookdev)
 - ai_gen_unit rows
 - lookdev_unit rows
@@ -251,11 +251,11 @@ Fallback: JetBrains Mono (icons omitted gracefully)
 | Wordmark | 13px | 800 | uppercase | .18em | App name in topbar |
 | Section label | 9px | 700 | uppercase | .16em | Sidebar group headers, section dividers |
 | Filter / chip | 9px | 700 | uppercase | .10em | Filter bar chips, tab labels |
-| Status label | 9px | 800 | uppercase | .10em | Task status text |
+| Status label | 9px | 800 | uppercase | .10em | Deliverable status text |
 | Nav item | 11px | 400 | lowercase | .02em | Sidebar navigation |
 | Nav item active | 11px | 700 | lowercase | .02em | Active nav item |
-| Task name | 12px | 400 | lowercase | .01em | Task row primary text |
-| Pane title | 14px | 700 | lowercase | .01em | Side pane task title |
+| Deliverable name | 12px | 400 | lowercase | .01em | Deliverable row primary text |
+| Pane title | 14px | 700 | lowercase | .01em | Side pane deliverable title |
 | Metadata | 10px | 400 | — | .03em | Assignees, due dates, phases |
 | Ghost / label | 9–10px | 400 | — | .03em | Timestamps, secondary metadata |
 | Version tag | 17px | 800 | lowercase | .06em | Version navigator large tag |
@@ -266,9 +266,9 @@ Fallback: JetBrains Mono (icons omitted gracefully)
 ### 5.3 Type rules
 
 - **Wordmark and section labels are uppercase.** Content is lowercase. This contrast is where the brutalist register lives.
-- **Task names are lowercase.** Always. Even proper nouns. The uniform case is part of the aesthetic.
+- **Deliverable names are lowercase.** Always. Even proper nouns. The uniform case is part of the aesthetic.
 - **No italic.** Never used in Relay UI.
-- **Strikethrough for done state.** Task names in done status use `text-decoration: line-through` and `--ink-3` colour. No other decoration used anywhere.
+- **Strikethrough for done state.** Deliverable names in done status use `text-decoration: line-through` and `--ink-3` colour. No other decoration used anywhere.
 
 ---
 
@@ -389,11 +389,11 @@ Border only, no fill. Used for AI-generated version references and non-current v
 
 | State | Bar colour | Dot colour | ANSI | Applies to |
 |---|---|---|---|---|
-| wip | yellow | yellow | 3/11 | task, asset component, render job |
-| review | steel blue | steel blue | 4/12 | task, lookdev verdict, asset |
-| blocked | red-orange | red-orange | 1/9 | task |
-| todo | ghost `--ink-3` | ghost | 8 | task, asset |
-| done | emerald | emerald | 2/10 | task, asset, render |
+| wip | yellow | yellow | 3/11 | deliverable, asset component, render job |
+| review | steel blue | steel blue | 4/12 | deliverable, lookdev verdict, asset |
+| blocked | red-orange | red-orange | 1/9 | deliverable |
+| todo | ghost `--ink-3` | ghost | 8 | deliverable, asset |
+| done | emerald | emerald | 2/10 | deliverable, asset, render |
 | approved | emerald | emerald | 2/10 | lookdev, review, asset |
 | rejected | red-orange | red-orange | 1/9 | lookdev, review |
 | revision | yellow | yellow | 3/11 | lookdev, review |
@@ -466,7 +466,7 @@ The constraint: **Relay does not accept raw hex values from community themes wit
 - Project name: 11px 400, `--ink`
 - Separator: `--line` 0.5px vertical
 - Action buttons: 10px 700 uppercase, `--ink-2`, no background
-- Primary action ("+ New task"): `--ink`, 800 weight
+- Primary action ("+ New deliverable"): `--ink`, 800 weight
 - No icons in topbar
 
 ### 10.2 Sidebar
@@ -478,12 +478,12 @@ The constraint: **Relay does not accept raw hex values from community themes wit
 - Nav separator: 0.5px `--line-s` horizontal rule
 - Item count badge: 10px `--ink-3`, right-aligned
 
-### 10.3 Task rows
+### 10.3 Deliverable rows
 
 - Height: natural — padding 10px 14px
 - Left border: 2px status colour (transparent for todo)
 - Checkbox: 13px × 13px, 0.5px border `--ink-3`. Done: filled `--ink`, checkmark `--bg`
-- Task name: 12px 400 lowercase `--ink`. Done state: `--ink-3` + strikethrough
+- Deliverable name: 12px 400 lowercase `--ink`. Done state: `--ink-3` + strikethrough
 - Phase: 9px `--ink-3`
 - Status label: 9px 800 uppercase, `--ink` on light, accent colour on dark/dim
 - Separator: 0.5px `--line` horizontal
@@ -541,7 +541,7 @@ Relay's PySide6 panels in Blender and Houdini are intentionally minimal. They do
 **Panel contains only:**
 1. Server status dot (7px, colours per §7.3)
 2. "Open Relay" button → `webbrowser.open()`
-3. "My Tasks" button → opens browser filtered to current artist
+3. "My Deliverables" button → opens browser filtered to current artist
 4. Refresh button
 
 **Panel uses no Qt WebEngine.** Opening the browser is the correct pattern. The panel is a launcher, not a viewport.
@@ -587,3 +587,4 @@ Relay's PySide6 panels in Blender and Houdini are intentionally minimal. They do
 *Three themes: concrete-light · concrete-dark · concrete-dim*
 *Five accents: yellow · red-orange · emerald · steel blue · indigo*
 *One typeface: JetBrains Mono*
+

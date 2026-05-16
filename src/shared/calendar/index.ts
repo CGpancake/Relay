@@ -5,8 +5,13 @@ import type { AllocationSelectionCell, AllocationView, CalendarDayWindowSettings
 export const DEFAULT_SNAP_MINUTES = 15;
 export const DEFAULT_DAY_MINUTES = 24 * 60;
 export const DEFAULT_DAY_WINDOW_SETTINGS: CalendarDayWindowSettings = { pastHours: 2, upcomingHours: 10 };
+export const WEEK_DAY_COLUMN_WIDTH = 112;
+export const MONTH_DAY_COLUMN_WIDTH = WEEK_DAY_COLUMN_WIDTH / 4;
+export const YEAR_MONTH_COLUMN_WIDTH = 112;
 export type VisibleDayWindow = { startMinute: number; endMinute: number };
 export type DateMinute = { date: string; minuteOfDay: number };
+export type BufferedCalendarRange = { dates: string[]; currentStart: number; currentEnd: number };
+export type TimelineCenterCoordinate = { date: string; fraction: number };
 
 export function datesForView(view: AllocationView, selectedDate: string) {
   const selected = new Date(`${selectedDate}T00:00:00`);
@@ -22,6 +27,77 @@ export function datesForView(view: AllocationView, selectedDate: string) {
     return Array.from({ length: daysInMonth(selected) }, (_, index) => formatDate(addDays(start, index)));
   }
   return Array.from({ length: 12 }, (_, index) => formatDate(new Date(selected.getFullYear(), index, 1)));
+}
+
+export function bufferedDatesForView(view: AllocationView, selectedDate: string): BufferedCalendarRange {
+  const previous = datesForView(view, shiftDateByView(selectedDate, view, -1));
+  const current = datesForView(view, selectedDate);
+  const next = datesForView(view, shiftDateByView(selectedDate, view, 1));
+  return {
+    dates: [...previous, ...current, ...next],
+    currentStart: previous.length,
+    currentEnd: previous.length + current.length,
+  };
+}
+
+export function compactColumnWidthForView(view: AllocationView) {
+  if (view === 'month') return MONTH_DAY_COLUMN_WIDTH;
+  if (view === 'year') return YEAR_MONTH_COLUMN_WIDTH;
+  return WEEK_DAY_COLUMN_WIDTH;
+}
+
+export function centeredDateFromTimeline(
+  view: AllocationView,
+  dates: string[],
+  scrollLeft: number,
+  clientWidth: number,
+  labelWidth: number,
+  columnWidth: number,
+) {
+  if (dates.length === 0) return null;
+  if (view === 'day') {
+    const centerMinute = (scrollLeft + clientWidth / 2 - labelWidth) / Math.max(columnWidth, 1);
+    return absoluteMinuteToDateMinute(dates[0], centerMinute).date;
+  }
+  const centerX = scrollLeft + clientWidth / 2 - labelWidth;
+  const index = Math.max(0, Math.min(dates.length - 1, Math.floor(centerX / Math.max(columnWidth, 1))));
+  return view === 'year' ? `${dates[index].slice(0, 7)}-01` : dates[index];
+}
+
+export function centeredTimelineCoordinate(
+  view: AllocationView,
+  dates: string[],
+  scrollLeft: number,
+  clientWidth: number,
+  labelWidth: number,
+  columnWidth: number,
+): TimelineCenterCoordinate | null {
+  if (dates.length === 0) return null;
+  const centerX = scrollLeft + clientWidth / 2 - labelWidth;
+  const rawIndex = centerX / Math.max(columnWidth, 1);
+  const index = Math.max(0, Math.min(dates.length - 1, Math.floor(rawIndex)));
+  const fraction = Math.max(0, Math.min(0.999999, rawIndex - Math.floor(rawIndex)));
+  return {
+    date: view === 'year' ? `${dates[index].slice(0, 7)}-01` : dates[index],
+    fraction,
+  };
+}
+
+export function scrollLeftForTimelineCoordinate(
+  view: AllocationView,
+  dates: string[],
+  coordinate: TimelineCenterCoordinate,
+  clientWidth: number,
+  labelWidth: number,
+  columnWidth: number,
+) {
+  const targetIndex = dates.findIndex((date) => (view === 'year' ? date.slice(0, 7) === coordinate.date.slice(0, 7) : date === coordinate.date));
+  if (targetIndex < 0) return null;
+  return labelWidth + (targetIndex + coordinate.fraction) * columnWidth - clientWidth / 2;
+}
+
+export function bufferedDayWindow(window: VisibleDayWindow): VisibleDayWindow {
+  return { startMinute: window.startMinute - DEFAULT_DAY_MINUTES, endMinute: window.endMinute + DEFAULT_DAY_MINUTES };
 }
 
 export function shiftDateByView(selectedDate: string, view: AllocationView, direction: -1 | 1) {
@@ -82,13 +158,11 @@ export function computeVisibleDayWindow(
   nowMinute: number,
   settings: CalendarDayWindowSettings = DEFAULT_DAY_WINDOW_SETTINGS,
 ): VisibleDayWindow {
-  const span = Math.max(DEFAULT_SNAP_MINUTES, Math.round((settings.pastHours + settings.upcomingHours) * 60));
-  if (selectedDate === today) {
-    const startMinute = nowMinute - Math.round(settings.pastHours * 60);
-    return { startMinute, endMinute: startMinute + span };
-  }
-  const start = Math.min(Math.max(0, 9 * 60), Math.max(0, DEFAULT_DAY_MINUTES - span));
-  return { startMinute: start, endMinute: Math.min(DEFAULT_DAY_MINUTES, start + span) };
+  void selectedDate;
+  void today;
+  void nowMinute;
+  void settings;
+  return { startMinute: 0, endMinute: DEFAULT_DAY_MINUTES };
 }
 
 export function minuteToWindowPercent(minute: number, window: VisibleDayWindow) {

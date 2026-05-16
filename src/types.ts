@@ -15,6 +15,13 @@ export type TaskReviewVersion = {
   date: string;
   kind: 'image' | 'video';
   summary: string;
+  projectId: string;
+  shotId: string;
+  frameStart: number;
+  frameEnd: number;
+  defaultFrame: number;
+  thumbnailUrl?: string;
+  proxyFrameUrlTemplate: string;
 };
 
 export type TaskComment = {
@@ -23,6 +30,8 @@ export type TaskComment = {
   date: string;
   versionId: string;
   body: string;
+  frameNumber?: number;
+  annotationIds?: string[];
 };
 
 export type Task = {
