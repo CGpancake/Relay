@@ -49,3 +49,29 @@ Current behavior: Archive uses an even desktop split between grouped filters and
 Decision: keep Calendar deliverable attachments transient and use them to update selected deliverable due dates on apply.
 
 Rationale: this validates producer planning behavior without changing the allocation data contract.
+
+## Hypervisor-hosted deployment target
+
+Decision: plan Relay hosting around a Linux VM running under the available hypervisor.
+
+Rationale: a VM keeps the prototype close to a normal production deployment shape while remaining simple to back up, rebuild, and isolate from local development machines.
+
+Operational note: refer to the host by the alias `relay-hypervisor` in docs and scripts. The SSH user is `it.admin`. Do not commit private IP addresses or passwords; operators should retrieve credentials from an approved secret manager or provide SSH keys.
+
+## Rez build and runtime environments
+
+Decision: use Rez packages to define repeatable build and runtime environments.
+
+Rationale: Rez can pin the Node/Vite frontend toolchain now and later add Python, FastAPI, Uvicorn, asyncpg, and PostgreSQL client tools without relying on ad hoc VM state.
+
+Current build shape: the direct deployment loop uses `npm ci`, `npm run build`, and deploys the generated `dist/` directory. The root Rez package is a scaffold for running the same commands through `rez-env relay` once the studio Rez package repository provides the required Node package.
+
+Future build shape: adapt the scaffold to the studio `rez-build` and `rez-publish` convention, including a decision about whether publishing stores only the environment package or also captures the built `dist/` artifact.
+
+## Static frontend first, API later
+
+Decision: deploy the first hosted version as a static Vite frontend served by Nginx or Caddy.
+
+Rationale: Relay is still a frontend-first prototype and does not need a long-running Node process after `dist/` is built.
+
+Future path: reserve `/annotations` for the existing FastAPI annotation service and PostgreSQL schema when durable annotation storage is required. Until then, the frontend can continue using its local annotation fallback when the API is unavailable.

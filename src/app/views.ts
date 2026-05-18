@@ -2,6 +2,7 @@ import {
   Archive,
   BookOpenText,
   CalendarDays,
+  ChartNetwork,
   FolderKanban,
   Handshake,
   ListChecks,
@@ -14,6 +15,7 @@ import { ArchiveFeatureView } from '../features/archive';
 import { BiddingFeatureView } from '../features/bidding';
 import { CalendarFeatureView } from '../features/calendar';
 import { DocumentationFeatureView } from '../features/documentation';
+import { FinanceMapFeatureView } from '../features/finance-map';
 import { PeopleFeatureView } from '../features/people';
 import { ProjectsFeatureView } from '../features/projects';
 import { SettingsFeatureView } from '../features/settings';
@@ -34,6 +36,7 @@ export const views: ViewModule[] = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays, canAccess: (person) => canAccess(person, 'calendar'), Component: CalendarFeatureView },
   { id: 'tasks', label: 'Deliverables', icon: ListChecks, canAccess: (person) => canAccess(person, 'tasks'), Component: TasksFeatureView },
   { id: 'bidding', label: 'Bidding', icon: Handshake, canAccess: (person) => canAccess(person, 'bidding'), Component: BiddingFeatureView },
+  { id: 'finance-map', label: 'Finance Map', icon: ChartNetwork, canAccess: (person) => canAccess(person, 'finance-map'), Component: FinanceMapFeatureView },
   { id: 'archive', label: 'Archive', icon: Archive, canAccess: (person) => canAccess(person, 'archive'), Component: ArchiveFeatureView },
   { id: 'documentation', label: 'Documentation', icon: BookOpenText, canAccess: (person) => canAccess(person, 'documentation'), Component: DocumentationFeatureView },
   { id: 'people', label: 'People', icon: Users, canAccess: (person) => canAccess(person, 'people'), Component: PeopleFeatureView },

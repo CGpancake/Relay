@@ -79,6 +79,7 @@ export type ViewId =
   | 'calendar'
   | 'tasks'
   | 'bidding'
+  | 'finance-map'
   | 'archive'
   | 'documentation'
   | 'people'

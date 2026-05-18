@@ -647,6 +647,7 @@ test('client role cannot access restricted views', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Documentation/ })).toBeEnabled();
   await expect(page.getByRole('button', { name: /Calendar/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Bidding/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /Finance Map/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /People/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: /Settings/ })).toBeDisabled();
   await page.getByRole('button', { name: /Deliverables/ }).click();
@@ -662,6 +663,37 @@ test('bidding appears in nav and renders placeholder view', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'bidding' })).toBeVisible();
 });
 
+test('finance map appears in nav and renders source flow content', async ({ page }) => {
+  await page.getByRole('button', { name: /Finance Map/ }).click();
+  await expect(page).toHaveURL(/\/finance-map$/);
+  await expect(page.getByRole('heading', { name: 'finance map' })).toBeVisible();
+  await expect(page.getByText('Production & Project Delivery').first()).toBeVisible();
+  await expect(page.getByText('New opportunity identified')).toBeVisible();
+});
+
+test('finance map switches flows and expands step detail', async ({ page }) => {
+  await page.getByRole('button', { name: /Finance Map/ }).click();
+  await page.getByRole('button', { name: /Invoicing & Payments/ }).click();
+  await expect(page.getByRole('heading', { name: 'Invoicing & Payments' })).toBeVisible();
+  await expect(page.getByText('Client details updated in Scoro')).toBeVisible();
+
+  await page.getByRole('button', { name: /Client details updated in Xero/ }).click();
+  await expect(page.getByText('Client contact created or updated in the correct Xero entity.')).toBeVisible();
+  await expect(page.getByText('Wrong client entity / account creates reporting')).toBeVisible();
+});
+
+test('finance map access follows internal role permissions', async ({ page }) => {
+  await expect(page.getByRole('button', { name: /Finance Map/ })).toBeEnabled();
+
+  await page.evaluate(() => localStorage.setItem('relay:current-person', 'person-manager'));
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Finance Map/ })).toBeEnabled();
+
+  await page.evaluate(() => localStorage.setItem('relay:current-person', 'person-artist-a'));
+  await page.reload();
+  await expect(page.getByRole('button', { name: /Finance Map/ })).toBeEnabled();
+});
+
 test('primary navigation order exposes one calendar entry', async ({ page }) => {
   const labels = await page.locator('.sidebar section').first().getByRole('button').evaluateAll((buttons) =>
     buttons.map((button) => button.querySelector('span')?.textContent?.trim()),
@@ -672,6 +704,7 @@ test('primary navigation order exposes one calendar entry', async ({ page }) => 
     'Calendar',
     'Deliverables',
     'Bidding',
+    'Finance Map',
     'Archive',
     'Documentation',
     'People',
@@ -1590,4 +1623,3 @@ test('day view supports snapped block creation, selected date marker, context de
   await page.getByTestId('allocation-context-menu').getByRole('button', { name: 'Delete' }).click();
   await expect(block).not.toBeVisible();
 });
-

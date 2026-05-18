@@ -5,13 +5,13 @@ import type { PermissionLevel, Permissions, Person, ViewId } from '../types';
 export const permissionsForPermissionLevel = (permissionLevel: PermissionLevel): Permissions => {
   switch (permissionLevel) {
     case 'Admin':
-      return { projects: true, calendar: true, tasks: true, bidding: true, archive: true, documentation: true, people: true, settings: true };
+      return { projects: true, calendar: true, tasks: true, bidding: true, 'finance-map': true, archive: true, documentation: true, people: true, settings: true };
     case 'Manager':
-      return { projects: true, calendar: true, tasks: true, bidding: true, archive: true, documentation: true, people: true, settings: false };
+      return { projects: true, calendar: true, tasks: true, bidding: true, 'finance-map': true, archive: true, documentation: true, people: true, settings: false };
     case 'Artist':
-      return { projects: true, calendar: true, tasks: true, bidding: false, archive: true, documentation: true, people: false, settings: false };
+      return { projects: true, calendar: true, tasks: true, bidding: false, 'finance-map': true, archive: true, documentation: true, people: false, settings: false };
     case 'Client':
-      return { projects: true, calendar: false, tasks: true, bidding: false, archive: false, documentation: true, people: false, settings: false };
+      return { projects: true, calendar: false, tasks: true, bidding: false, 'finance-map': false, archive: false, documentation: true, people: false, settings: false };
   }
 };
 

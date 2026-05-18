@@ -14,8 +14,9 @@ The prototype validates a deliverable workflow:
 ## Docs
 
 - `project-overview.md`: current product and implementation overview.
-- `decisions.md`: architectural and product decisions.
-- `implementation-log.md`: condensed implementation history.
+- `decisions.md`: architectural, product, hosting, and environment decisions.
+- `deployment.md`: Rez build, hypervisor deployment, static web server setup, and future API path.
+- `implementation-log.md`: condensed implementation history and deployment learnings.
 - `glossary.md`: current terms.
 - `testing-debug-guide.md`: verification and debugging checklist.
 - `relay-design-system.md`: visual reference; current app language should read Deliverables.
