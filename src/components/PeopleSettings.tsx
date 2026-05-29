@@ -103,6 +103,9 @@ export function PeopleView({
               <span>
                 <strong>{person.name}</strong>
                 <small>{person.discipline}</small>
+                {person.engagementStatus && <small>{formatEngagementStatus(person.engagementStatus)}</small>}
+                {(person.email || person.phone) && <small>{[person.email, person.phone].filter(Boolean).join(' · ')}</small>}
+                {person.notes && <small className="people-contact-notes" title={person.notes}>{person.notes}</small>}
               </span>
               <span>
                 <input
@@ -380,6 +383,10 @@ export function SettingsView({
       </section>
     </>
   );
+}
+
+function formatEngagementStatus(status: NonNullable<Person['engagementStatus']>) {
+  return status.replaceAll('_', ' ');
 }
 
 function calendarModeLabel(mode: CalendarMode) {

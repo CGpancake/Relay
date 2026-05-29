@@ -10,7 +10,7 @@ Relay uses a left sidebar and a persistent header. The sidebar can collapse into
 - Bidding: reserved prototype view.
 - Archive: review active and archived projects, archived deliverables and subdeliverables, aggregate counts, filters, restore actions, and the relationship graph.
 - Documentation: browse these bundled markdown pages with wiki links.
-- People: inspect and edit local people and permission levels where allowed.
+- People: inspect and edit people records and permission levels where allowed; records may be API-backed when the local backend is running.
 - Settings: choose current prototype user, theme, accent, timezone, and calendar display preferences.
 
 ## Routes
@@ -19,4 +19,4 @@ Relay uses a left sidebar and a persistent header. The sidebar can collapse into
 
 ## Notifications
 
-The notification bell stores frontend-only deliverable update records for the current session. It validates follower behavior and update placement, but it is not realtime, persistent, or production authorization.
+The notification bell stores session-only deliverable update records. It validates follower behavior and update placement, but it is not realtime, durable, or production authorization.

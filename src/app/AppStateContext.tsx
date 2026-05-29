@@ -1,5 +1,6 @@
 import React from 'react';
 import { createSeedAllocations, createSeedPeople, createSeedProjects, createSeedTasks } from '../data/seed';
+import { listPeople } from '../features/people/api';
 import { DEFAULT_DAY_WINDOW_SETTINGS } from '../shared/calendar';
 import { defaultAccentKey, defaultThemeId, isAccentKey, isThemeId, type ThemeAccentKey } from '../themes';
 import type { Allocation, ArchiveState, Booking, CalendarDayWindowSettings, CalendarOverlaySettings, Person, Project, Task, TaskNotification } from '../types';
@@ -57,6 +58,22 @@ const AppDispatchContext = React.createContext<React.Dispatch<AppAction> | null>
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(appReducer, undefined, createInitialState);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    listPeople()
+      .then((people) => {
+        if (!cancelled && people.length > 0) {
+          dispatch({ type: 'people/set', updater: people });
+        }
+      })
+      .catch(() => {
+        // Prototype fallback: keep in-memory seed people when the optional API is unavailable.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (!state.people.some((person) => person.id === state.currentPersonId) && state.people[0]) {

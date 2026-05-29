@@ -1,10 +1,34 @@
 # Decisions
 
-## Frontend-only prototype
+## Frontend-first prototype with local People API
 
-Decision: keep Relay as a deterministic frontend prototype while workflow shape is still changing.
+Decision: keep Relay frontend-first and deterministic for workflow iteration, while adding a local FastAPI boundary for durable People data.
 
-Rationale: local state keeps iteration fast and avoids implying final backend contracts too early.
+Rationale: project, deliverable, allocation, archive, and review behavior still benefits from fast local iteration. People/contact data now needs persistence beyond page reloads and should not live as hidden browser state.
+
+## FastAPI boundary for People
+
+Decision: expose People persistence through `/api/people` from the FastAPI app in `backend/app/main.py`.
+
+Rationale: a backend boundary lets the UI validate real API loading, creation, editing, permission updates, and archive behavior without locking the whole product into a final production schema.
+
+## SQLite placeholder, PostgreSQL-ready path
+
+Decision: use `backend/.data/relay-dev.sqlite3` as the default local development database and keep the code path compatible with a later PostgreSQL `DATABASE_URL` deployment.
+
+Rationale: SQLite makes local setup copy-pasteable and keeps seed validation simple. PostgreSQL remains the intended production direction once durability, migrations, backups, and environment management are finalized.
+
+## People source of truth behind API
+
+Decision: People contacts, phone numbers, engagement status, and permission settings belong behind the People API when the backend is running. Browser localStorage is for preferences, drafts, and fallback annotations only.
+
+Rationale: localStorage is useful for UI preference persistence but is not an appropriate canonical contact store.
+
+## Excel contact list as seed data
+
+Decision: import `CM Freelance List 2026.xlsx` as generated seed data in `src/data/importedFreelancePeople.ts` and `backend/app/freelance_people.py`.
+
+Rationale: imported contacts should be visible, reviewable, and repeatably seeded instead of trapped in one browser profile. Duplicate spreadsheet names are merged by normalized name; retained details are carried in notes where no first-class field exists.
 
 ## Deliverables language with Task internals
 
@@ -68,10 +92,10 @@ Current build shape: the direct deployment loop uses `npm ci`, `npm run build`, 
 
 Future build shape: adapt the scaffold to the studio `rez-build` and `rez-publish` convention, including a decision about whether publishing stores only the environment package or also captures the built `dist/` artifact.
 
-## Static frontend first, API later
+## Static frontend remains valid with API proxy path
 
-Decision: deploy the first hosted version as a static Vite frontend served by Nginx or Caddy.
+Decision: deploy the hosted UI as a static Vite frontend served by Nginx or Caddy, and route API traffic under `/api/*` to a backend service when People persistence is enabled.
 
-Rationale: Relay is still a frontend-first prototype and does not need a long-running Node process after `dist/` is built.
+Rationale: Relay does not need a long-running Node process after `dist/` is built. API traffic should have a separate service boundary and reverse proxy path.
 
 Future path: reserve `/annotations` for the existing FastAPI annotation service and PostgreSQL schema when durable annotation storage is required. Until then, the frontend can continue using its local annotation fallback when the API is unavailable.

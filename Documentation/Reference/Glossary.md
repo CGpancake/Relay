@@ -16,6 +16,26 @@ The side detail surface opened from the deliverables board. It contains metadata
 
 A deliverable flag that marks work as visible to Client permission users.
 
+## Person
+
+A People record for a team member, freelancer, client, bot, or contact.
+
+## Engagement status
+
+A Person availability label: permanent, available to hire, unavailable, or unknown.
+
+## Permission level
+
+A prototype access level such as Admin, Manager, Artist, or Client. It is separate from a person's job role, discipline, or engagement status.
+
+## Local preference
+
+A browser-saved setting such as theme, accent, current prototype user, timezone, or calendar display preference.
+
+## People API
+
+The local backend route Relay can use to load and save People records when the backend is running.
+
 ## Archive
 
 The in-memory restoreable store for projects, deliverables, subdeliverables, and allocation bundles removed from active views.
@@ -26,4 +46,4 @@ An Archive panel that displays studios, projects, deliverables, subdeliverables,
 
 ## Prototype state
 
-Seeded local React state. Most data resets on reload; selected theme, current user, timezone, and display preferences persist in local storage.
+Seeded local React state. Most core workflow data resets on reload; selected theme, current user, timezone, and display preferences persist in local storage. People can persist through the local API-backed SQLite path when enabled.

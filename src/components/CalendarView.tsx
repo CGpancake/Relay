@@ -19,6 +19,7 @@ import { useCalendarState } from '../shared/calendar/useCalendarState';
 import type { Allocation, AllocationSelectionCell, CalendarDayWindowSettings, CalendarMode, CalendarOverlaySettings, Person, Project, Task, TimeOffEntry, TimeOffStatus, TimeOffType } from '../types';
 import { CalendarDayView } from './calendar/CalendarDayView';
 import { CalendarCompactView } from './calendar/CalendarCompactView';
+import { applyTimeOffOperation, deleteTimeOffEntries, setTimeOffStatus } from '../features/calendar/timeOffModel';
 import {
   AllocationDragState, SegmentDraft,
   CAPACITY_MINUTES, DAY_MINUTES, SNAP_MINUTES, DEFAULT_SEGMENT,
@@ -297,53 +298,24 @@ export function CalendarView({
   const applyTimeOff = () => {
     if (view === 'year') return;
     setTimeOffValidation('');
-    const selectedEntryIds = selection.map((cell) => cell.allocationId).filter(Boolean) as string[];
     const nextStart = timeOffMode === 'full-day' ? 0 : timeOffStartMinute;
     const nextEnd = timeOffMode === 'full-day' ? DAY_MINUTES : timeOffEndMinute;
-
-    if (selectedEntryIds.length > 0) {
-      const editedEntries = selectedEntryIds
-        .map((id) => timeOff.find((entry) => entry.id === id))
-        .filter(Boolean)
-        .map((entry) => normalizeTimeOff({ ...(entry as TimeOffEntry), type: timeOffType, startMinute: nextStart, endMinute: nextEnd }));
-      if (editedEntries.some((entry) => hasTimeOffOverlap(timeOff, entry, selectedEntryIds))) {
-        setTimeOffValidation('Time off overlaps an existing time off entry for the same person and time range.');
-        return;
-      }
-      setTimeOff((current) => current.map((entry) => editedEntries.find((edited) => edited.id === entry.id) ?? entry));
+    const result = applyTimeOffOperation({ entries: timeOff, selection, type: timeOffType, startMinute: nextStart, endMinute: nextEnd });
+    if (!result.ok) {
+      if (result.reason === 'overlap') setTimeOffValidation('Time off overlaps an existing time off entry for the same person and time range.');
       return;
     }
-
-    const selectedCells = selection.filter((cell) => !cell.allocationId && cell.rowType === 'summary');
-    if (selectedCells.length === 0 || nextEnd <= nextStart) return;
-    const additions = selectedCells.map((cell, index) =>
-      normalizeTimeOff({
-        id: `time-off-local-${Date.now()}-${index}`,
-        personId: cell.personId,
-        date: cell.date,
-        startMinute: nextStart,
-        endMinute: nextEnd,
-        type: timeOffType,
-        status: 'pending',
-      }),
-    );
-    if (additions.some((entry) => hasTimeOffOverlap(timeOff, entry))) {
-      setTimeOffValidation('Time off overlaps an existing time off entry for the same person and time range.');
-      return;
-    }
-    setTimeOff((current) => [...current, ...additions]);
+    setTimeOff(result.entries);
   };
 
   const setSelectedTimeOffStatus = (status: TimeOffStatus) => {
     if (!canApprove || selectedTimeOff.length === 0) return;
-    const ids = selectedTimeOff.map((entry) => entry.id);
-    setTimeOff((current) => current.map((entry) => (ids.includes(entry.id) ? { ...entry, status } : entry)));
+    setTimeOff((current) => setTimeOffStatus(current, selectedTimeOff, status));
   };
 
   const deletePendingTimeOff = () => {
     if (!canDeletePendingTimeOff) return;
-    const ids = selectedTimeOff.map((entry) => entry.id);
-    setTimeOff((current) => current.filter((entry) => !ids.includes(entry.id)));
+    setTimeOff((current) => deleteTimeOffEntries(current, selectedTimeOff));
     setSelection([]);
     setTimeOffValidation('');
   };
@@ -973,23 +945,6 @@ function splitAbsoluteAllocationRange(
     });
   }
   return parts.filter((allocation) => allocation.endMinute - allocation.startMinute >= SNAP_MINUTES);
-}
-
-function normalizeTimeOff(entry: TimeOffEntry): TimeOffEntry {
-  const startMinute = clampMinute(entry.startMinute);
-  const endMinute = Math.max(startMinute + SNAP_MINUTES, clampMinute(entry.endMinute));
-  return { ...entry, startMinute, endMinute: Math.min(DAY_MINUTES, endMinute), status: entry.status ?? 'pending', notes: entry.notes?.trim() || undefined };
-}
-
-function hasTimeOffOverlap(entries: TimeOffEntry[], candidate: TimeOffEntry, excludedIds: string[] = []) {
-  return entries.some(
-    (entry) =>
-      !excludedIds.includes(entry.id) &&
-      entry.personId === candidate.personId &&
-      entry.date === candidate.date &&
-      candidate.startMinute < entry.endMinute &&
-      candidate.endMinute > entry.startMinute,
-  );
 }
 
 function hourOptions() {

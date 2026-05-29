@@ -1,14 +1,15 @@
 import React from 'react';
 import { monthLabel, shortDate } from '../lib/date';
 import { canApproveBookings } from '../lib/permissions';
-import { blockStyle, clampMinute as clampCalendarMinute, dateMatchesView, minuteFromPointer } from '../shared/calendar';
+import { blockStyle, dateMatchesView, DEFAULT_DAY_MINUTES, DEFAULT_SNAP_MINUTES, minuteFromPointer } from '../shared/calendar';
 import { CalendarToolbar } from '../shared/calendar/CalendarToolbar';
 import { useCalendarState } from '../shared/calendar/useCalendarState';
 import type { Allocation, AllocationSelectionCell, AllocationView as BookingViewMode, Booking, BookingStatus, BookingType, Person, Project } from '../types';
 import { allocationsFor, colorForProject, durationMinutes } from './calendar/calendarUtils';
+import { applyTimeOffOperation, hasTimeOffOverlap, normalizeTimeOffEntry, setTimeOffStatus } from '../features/calendar/timeOffModel';
 
-const SNAP_MINUTES = 15;
-const DAY_MINUTES = 24 * 60;
+const SNAP_MINUTES = DEFAULT_SNAP_MINUTES;
+const DAY_MINUTES = DEFAULT_DAY_MINUTES;
 
 type DragState =
   | { kind: 'create'; personId: string; date: string; startMinute: number; endMinute: number }
@@ -94,52 +95,29 @@ export function BookingsView({
 
   const applyBooking = () => {
     setValidationMessage('');
-    const selectedBookingIds = selection.map((cell) => cell.allocationId).filter(Boolean) as string[];
     const nextStart = timeMode === 'full-day' ? 0 : startMinute;
     const nextEnd = timeMode === 'full-day' ? DAY_MINUTES : endMinute;
-
-    if (selectedBookingIds.length > 0) {
-      const editedBookings = selectedBookingIds
-        .map((id) => bookings.find((booking) => booking.id === id))
-        .filter(Boolean)
-        .map((booking) => normalizeBooking({ ...(booking as Booking), type, startMinute: nextStart, endMinute: nextEnd }));
-      const conflict = editedBookings.some((booking) => hasBookingOverlap(bookings, booking, selectedBookingIds));
-      if (conflict) {
-        setValidationMessage('Booking overlaps an existing booking for the same person and time range.');
-        return;
-      }
-      setBookings((current) => current.map((booking) => editedBookings.find((edited) => edited.id === booking.id) ?? booking));
+    const result = applyTimeOffOperation({
+      entries: bookings,
+      selection,
+      type,
+      startMinute: nextStart,
+      endMinute: nextEnd,
+      defaultStatus,
+      idPrefix: 'booking-local',
+      summaryOnly: false,
+    });
+    if (!result.ok) {
+      if (result.reason === 'overlap') setValidationMessage('Booking overlaps an existing booking for the same person and time range.');
       return;
     }
-
-    const selectedCells = selection.filter((cell) => !cell.allocationId);
-    if (selectedCells.length === 0 || nextEnd <= nextStart) {
-      return;
-    }
-    const additions = selectedCells.map((cell, index) =>
-      normalizeBooking({
-        id: `booking-local-${Date.now()}-${index}`,
-        personId: cell.personId,
-        date: cell.date,
-        startMinute: nextStart,
-        endMinute: nextEnd,
-        type,
-        status: defaultStatus,
-      }),
-    );
-    const conflict = additions.some((booking) => hasBookingOverlap(bookings, booking));
-    if (conflict) {
-      setValidationMessage('Booking overlaps an existing booking for the same person and time range.');
-      return;
-    }
-    setBookings((current) => [...current, ...additions]);
+    setBookings(result.entries);
   };
 
   const setSelectedBookingStatus = (status: BookingStatus) => {
     if (!canApprove || selectedBookings.length === 0) return;
     setValidationMessage('');
-    const ids = selectedBookings.map((booking) => booking.id);
-    setBookings((current) => current.map((booking) => (ids.includes(booking.id) ? { ...booking, status } : booking)));
+    setBookings((current) => setTimeOffStatus(current, selectedBookings, status));
   };
 
   const deleteSelection = () => {
@@ -500,29 +478,11 @@ function bookingsFor(bookings: Booking[], personId: string, date: string, view: 
   return bookings.filter((booking) => booking.personId === personId && dateMatchesView(booking.date, date, view));
 }
 
-function normalizeBooking(booking: Booking): Booking {
-  const startMinute = clampMinute(booking.startMinute);
-  const endMinute = Math.max(startMinute + SNAP_MINUTES, clampMinute(booking.endMinute));
-  return { ...booking, startMinute, endMinute: Math.min(DAY_MINUTES, endMinute), status: booking.status ?? 'pending', notes: booking.notes?.trim() || undefined };
-}
-
-function hasBookingOverlap(bookings: Booking[], candidate: Booking, excludedIds: string[] = []) {
-  return bookings.some(
-    (booking) =>
-      !excludedIds.includes(booking.id) &&
-      booking.personId === candidate.personId &&
-      booking.date === candidate.date &&
-      candidate.startMinute < booking.endMinute &&
-      candidate.endMinute > booking.startMinute,
-  );
-}
+const normalizeBooking = normalizeTimeOffEntry;
+const hasBookingOverlap = hasTimeOffOverlap;
 
 function bookingTypeLabel(type: BookingType) {
   return type === 'sick-leave' ? 'Sick leave' : 'Holiday';
-}
-
-function clampMinute(value: number) {
-  return clampCalendarMinute(value, SNAP_MINUTES, DAY_MINUTES);
 }
 
 function timeLabel(minutes: number) {

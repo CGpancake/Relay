@@ -2419,6 +2419,13 @@ button.booking-overlay,
   gap: var(--space-1);
 }
 
+.people-contact-notes {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .permission-grid {
   display: grid;
   gap: var(--space-1);

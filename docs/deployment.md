@@ -1,8 +1,32 @@
 # Deployment
 
-Relay is deployed first as a static Vite frontend. The VM only needs to serve the generated `dist/` directory.
+Relay is deployed first as a static Vite frontend. Local development can also run the optional FastAPI backend for People persistence.
 
-Rez support is scaffolded but not yet required by the current deployment loop. Today the same build can be run either through npm directly or through the root Rez package once a studio Rez repository provides the required Node package.
+## Local development runbook
+
+Install backend dependencies, seed SQLite, and run the API:
+
+```bat
+cd /d D:\VoidMonolith\Relay
+python -m pip install -r backend/requirements.txt
+python -m backend.scripts.seed_people
+python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Run the frontend in another terminal:
+
+```bat
+cd /d D:\VoidMonolith\Relay
+npm run dev
+```
+
+Validate:
+
+- `http://127.0.0.1:8000/api/health`
+- `http://127.0.0.1:8000/api/people`
+- `http://127.0.0.1:5173/people`
+
+Expected People seed count is 371 records after the current import.
 
 ## Target host
 
@@ -14,24 +38,26 @@ Do not commit private IP addresses, passwords, or one-off operator secrets.
 
 ## Build environment
 
-The current direct build commands are:
+The current direct frontend build commands are:
 
 ```sh
 npm ci
 npm run build
 ```
 
-The root Rez package also defines frontend build command aliases:
+Expected frontend build runtime:
+
+- Node 20 or newer
+- npm 10 or newer
+
+The backend currently supports Python 3.9; keep backend annotations compatible with that version unless the project upgrades Python.
+
+The root Rez package defines frontend build command aliases:
 
 - `relay_install`: runs `npm ci`
 - `relay_build`: runs `npm run build`
 - `relay_preview`: runs `npm run preview`
 - `relay_smoke`: runs `npm run test:smoke`
-
-Expected build runtime:
-
-- Node 20 or newer
-- npm 10 or newer
 
 Build from a Rez shell:
 
@@ -47,6 +73,8 @@ If Rez is not available on the current workstation, use the direct commands:
 npm ci
 npm run build
 ```
+
+Vite may warn that some chunks exceed 500 kB after minification. That is currently a warning, not a failed build.
 
 ## Rez publish path
 
@@ -68,9 +96,9 @@ rez-env relay -- relay_install
 rez-env relay -- relay_build
 ```
 
-Runtime hosting still does not use Rez. Nginx serves static files from `/opt/relay/current/dist`; Rez is only for repeatable build/deploy tooling.
+Runtime static hosting does not use Rez. Nginx serves static files from `/opt/relay/current/dist`; Rez is only for repeatable build/deploy tooling.
 
-## Static web server
+## Static web server and API proxy
 
 Use `deploy/nginx/relay.conf` as the baseline Nginx site config. It expects the built app at:
 
@@ -79,6 +107,8 @@ Use `deploy/nginx/relay.conf` as the baseline Nginx site config. It expects the 
 ```
 
 The config serves hashed Vite assets with long-lived cache headers and falls back all app routes to `index.html`.
+
+When deploying API-backed People persistence, add a reverse proxy for `/api/*` to the Uvicorn backend service. Keep API credentials and database URLs in the VM secret store or process manager environment, not in git.
 
 Install flow on the VM:
 
@@ -116,8 +146,6 @@ When enabling the API:
 2. Apply `backend/schema.sql`.
 3. Run `backend/annotations_service.py` with `DATABASE_URL`.
 4. Enable the commented `/annotations` reverse proxy block in the Nginx config and point it at the Uvicorn service.
-
-Keep `DATABASE_URL` and database credentials in the VM secret store or process manager environment, not in git.
 
 ## Verification
 

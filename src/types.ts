@@ -74,6 +74,7 @@ export type Project = {
 };
 
 export type PermissionLevel = 'Admin' | 'Manager' | 'Artist' | 'Client';
+export type EngagementStatus = 'permanent' | 'available_to_hire' | 'unavailable' | 'unknown';
 export type ViewId =
   | 'projects'
   | 'calendar'
@@ -98,6 +99,14 @@ export type Person = {
   permissionLevel: PermissionLevel;
   discipline: string;
   permissions: Permissions;
+  email?: string | null;
+  phone?: string | null;
+  engagementStatus?: EngagementStatus;
+  notes?: string | null;
+  isBot?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  archivedAt?: string | null;
 };
 
 export type AllocationStatus = 'planned' | 'queued' | 'active' | 'blocked' | 'done';

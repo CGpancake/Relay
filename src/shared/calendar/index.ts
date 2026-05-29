@@ -158,11 +158,14 @@ export function computeVisibleDayWindow(
   nowMinute: number,
   settings: CalendarDayWindowSettings = DEFAULT_DAY_WINDOW_SETTINGS,
 ): VisibleDayWindow {
-  void selectedDate;
-  void today;
-  void nowMinute;
-  void settings;
-  return { startMinute: 0, endMinute: DEFAULT_DAY_MINUTES };
+  if (selectedDate !== today) return { startMinute: 0, endMinute: DEFAULT_DAY_MINUTES };
+
+  const safeNow = Math.max(0, Math.min(DEFAULT_DAY_MINUTES, nowMinute));
+  const pastMinutes = Math.max(0, Number.isFinite(settings.pastHours) ? settings.pastHours * 60 : DEFAULT_DAY_WINDOW_SETTINGS.pastHours * 60);
+  const upcomingMinutes = Math.max(DEFAULT_SNAP_MINUTES, Number.isFinite(settings.upcomingHours) ? settings.upcomingHours * 60 : DEFAULT_DAY_WINDOW_SETTINGS.upcomingHours * 60);
+  const startMinute = snapAbsoluteMinute(safeNow - pastMinutes);
+  const endMinute = Math.max(startMinute + DEFAULT_SNAP_MINUTES, snapAbsoluteMinute(safeNow + upcomingMinutes));
+  return { startMinute, endMinute };
 }
 
 export function minuteToWindowPercent(minute: number, window: VisibleDayWindow) {

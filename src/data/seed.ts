@@ -1,5 +1,6 @@
 import type { Allocation, Person, Project, Task } from '../types';
 import { permissionsForPermissionLevel } from '../lib/permissions';
+import { importedFreelancePeople } from './importedFreelancePeople';
 
 const seedReviewVersions = (taskId: string, projectId: string, title: string) => [
   {
@@ -77,6 +78,7 @@ export const createSeedPeople = (): Person[] => [
     role: 'Admin',
     permissionLevel: 'Admin',
     discipline: 'Admin',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Admin'),
   },
   {
@@ -85,6 +87,7 @@ export const createSeedPeople = (): Person[] => [
     role: 'Manager',
     permissionLevel: 'Manager',
     discipline: 'Manager',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Manager'),
   },
   {
@@ -93,6 +96,7 @@ export const createSeedPeople = (): Person[] => [
     role: 'Manager',
     permissionLevel: 'Manager',
     discipline: 'Manager',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Manager'),
   },
   {
@@ -101,6 +105,7 @@ export const createSeedPeople = (): Person[] => [
     role: 'Artist',
     permissionLevel: 'Artist',
     discipline: 'Artist',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Artist'),
   },
   {
@@ -109,6 +114,7 @@ export const createSeedPeople = (): Person[] => [
     role: 'Artist',
     permissionLevel: 'Artist',
     discipline: 'Artist',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Artist'),
   },
   {
@@ -117,8 +123,13 @@ export const createSeedPeople = (): Person[] => [
     role: 'Artist',
     permissionLevel: 'Artist',
     discipline: 'Artist',
+    engagementStatus: 'permanent',
     permissions: permissionsForPermissionLevel('Artist'),
   },
+  ...importedFreelancePeople.map((person) => ({
+    ...person,
+    permissions: permissionsForPermissionLevel(person.permissionLevel),
+  })),
 ];
 
 const task = (

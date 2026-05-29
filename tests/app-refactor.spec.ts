@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { appReducer, type AppState } from '../src/app/AppStateContext';
 import { DEFAULT_SEGMENT, connectedTimeOffEntries, compactAllocationSegmentStyle, dayHourTicks, dayOverbookSegments, mergeAdjacentAllocations, monthlyOverbookedMinutesByProject, monthlyProjectStats, ukBankHolidaysForDate } from '../src/components/calendar/calendarUtils';
 import { createSeedAllocations, createSeedPeople, createSeedProjects, createSeedTasks } from '../src/data/seed';
+import { applyTimeOffOperation, deleteTimeOffEntries, setTimeOffStatus } from '../src/features/calendar/timeOffModel';
 import { scanElementsManifest } from '../vite.config';
 import {
   absoluteMinuteToDateMinute,
@@ -127,26 +128,51 @@ test('shared calendar helpers cover date shifts, year matching, and block geomet
 
 test('visible day window helpers cover focused ranges and clipped geometry', () => {
   const todayWindow = computeVisibleDayWindow('2026-05-13', '2026-05-13', 12 * 60, DEFAULT_DAY_WINDOW_SETTINGS);
-  expect(todayWindow).toEqual({ startMinute: 0, endMinute: 24 * 60 });
-  expect(minuteToWindowPercent(12 * 60, todayWindow)).toBe(50);
-  expect(visibleBlockStyle(9 * 60, 11 * 60, todayWindow)).toEqual({ left: '37.5%', right: 'auto', width: '8.333333333333332%' });
+  expect(todayWindow).toEqual({ startMinute: 10 * 60, endMinute: 22 * 60 });
+  expect(minuteToWindowPercent(12 * 60, todayWindow)).toBe(16.666666666666664);
+  expect(visibleBlockStyle(9 * 60, 11 * 60, todayWindow)).toEqual({ left: '0%', right: 'auto', width: '8.333333333333332%' });
 
   const nonTodayWindow = computeVisibleDayWindow('2026-05-14', '2026-05-13', 12 * 60, DEFAULT_DAY_WINDOW_SETTINGS);
   expect(nonTodayWindow).toEqual({ startMinute: 0, endMinute: 24 * 60 });
   expect(visibleBlockStyle(22 * 60, 23 * 60, nonTodayWindow)).toEqual({ left: '91.66666666666666%', right: 'auto', width: '4.166666666666666%' });
 
   const edgeWindow = computeVisibleDayWindow('2026-05-13', '2026-05-13', 30, DEFAULT_DAY_WINDOW_SETTINGS);
-  expect(edgeWindow).toEqual({ startMinute: 0, endMinute: 24 * 60 });
+  expect(edgeWindow).toEqual({ startMinute: -90, endMinute: 630 });
+});
+
+test('canonical time off model applies create, edit, status, delete, and overlap rules', () => {
+  const selection = [{ personId: 'person-1', date: '2026-05-13', rowType: 'summary' as const }];
+  const created = applyTimeOffOperation({ entries: [], selection, type: 'holiday', startMinute: 0, endMinute: 24 * 60, now: 42 });
+  expect(created).toEqual({
+    ok: true,
+    entries: [{ id: 'time-off-local-42-0', personId: 'person-1', date: '2026-05-13', startMinute: 0, endMinute: 24 * 60, type: 'holiday', status: 'pending' }],
+    changedEntryIds: ['time-off-local-42-0'],
+  });
+  if (!created.ok) throw new Error('expected create success');
+
+  const edited = applyTimeOffOperation({
+    entries: created.entries,
+    selection: [{ ...selection[0], allocationId: 'time-off-local-42-0' }],
+    type: 'sick-leave',
+    startMinute: 9 * 60,
+    endMinute: 13 * 60,
+  });
+  expect(edited.ok).toBe(true);
+  if (!edited.ok) throw new Error('expected edit success');
+  expect(edited.entries[0]).toMatchObject({ type: 'sick-leave', startMinute: 9 * 60, endMinute: 13 * 60 });
+  expect(applyTimeOffOperation({ entries: edited.entries, selection, type: 'holiday', startMinute: 10 * 60, endMinute: 12 * 60 }).ok).toBe(false);
+  expect(setTimeOffStatus(edited.entries, edited.entries, 'confirmed')[0].status).toBe('confirmed');
+  expect(deleteTimeOffEntries(edited.entries, edited.entries)).toEqual([]);
 });
 
 test('cross-midnight day helpers preserve adjacent-date minutes', () => {
   const eveningWindow = computeVisibleDayWindow('2026-05-13', '2026-05-13', 20 * 60, DEFAULT_DAY_WINDOW_SETTINGS);
-  expect(eveningWindow).toEqual({ startMinute: 0, endMinute: 24 * 60 });
+  expect(eveningWindow).toEqual({ startMinute: 18 * 60, endMinute: 30 * 60 });
   expect(absoluteMinuteToDateMinute('2026-05-13', -60)).toEqual({ date: '2026-05-12', minuteOfDay: 23 * 60 });
   expect(absoluteMinuteToDateMinute('2026-05-13', 26 * 60)).toEqual({ date: '2026-05-14', minuteOfDay: 2 * 60 });
   expect(dateMinuteToAbsoluteMinute('2026-05-13', '2026-05-12', 23 * 60)).toBe(-60);
   expect(dateMinuteToAbsoluteMinute('2026-05-13', '2026-05-14', 2 * 60)).toBe(26 * 60);
-  expect(clipDateMinuteRangeToVisibleWindow('2026-05-13', '2026-05-14', 60, 3 * 60, eveningWindow)).toEqual(null);
+  expect(clipDateMinuteRangeToVisibleWindow('2026-05-13', '2026-05-14', 60, 3 * 60, eveningWindow)).toEqual({ startMinute: 25 * 60, endMinute: 27 * 60 });
 });
 
 test('day hour ticks cover the three-day buffer and cycle labels', () => {

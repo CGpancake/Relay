@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test/debug output
+test-results/
+playwright-report/
+
+# Local agent/editor state
+.pi/
+.claude/
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Backend local runtime data
+backend/.data/
+__pycache__/
+*.py[cod]
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db

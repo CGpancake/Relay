@@ -1,5 +1,5 @@
 import React from 'react';
-import { TaskView } from '../../components/TaskView';
+import { DeliverablesView } from '../deliverables/DeliverablesView';
 import { useAppState } from '../../app/AppStateContext';
 import { useAppActions } from '../../app/useAppActions';
 import { themes } from '../../themes';
@@ -50,7 +50,7 @@ export function TasksFeatureView() {
   }, [actions]);
 
   return (
-    <TaskView
+    <DeliverablesView
       accentKey={state.accentKey}
       activeTheme={activeTheme}
       currentUser={currentUser}
